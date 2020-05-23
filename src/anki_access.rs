@@ -2,9 +2,9 @@ extern crate rusqlite;
 extern crate serde_json;
 
 pub use crate::errors::AppError;
-use rusqlite::{params, Connection, Statement, NO_PARAMS};
+use rusqlite::{params, Connection, Statement, ToSql, NO_PARAMS};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug)]
 pub struct Deck {
@@ -12,10 +12,17 @@ pub struct Deck {
     pub name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum NoteStatus {
+    Active,
+    SuspendedKnown,
+    SuspendedUnknown,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ZhNote {
-    pub zh_word: String,
-    pub is_active: bool,
+    pub zh_field: String,
+    pub status: NoteStatus,
 }
 
 pub fn get_decks(conn: &Connection) -> Result<Vec<Deck>, AppError> {
@@ -32,58 +39,38 @@ pub fn get_decks(conn: &Connection) -> Result<Vec<Deck>, AppError> {
 pub fn get_zh_notes(
     conn: &Connection,
     note_field_map: &HashMap<&str, &str>,
-    active_deck_ids: &Vec<i64>,
-    non_active_deck_ids: &Vec<i64>,
-) -> Result<Vec<ZhNote>, AppError> {
+) -> Result<HashSet<ZhNote>, AppError> {
     let fields_info = get_zh_fields_info(conn, note_field_map)?;
-    // let mut all_words: Vec<ZhNote> = Vec::new();
-    let mut word_map: HashMap<String, bool> = HashMap::new();
+    let mut all_notes: HashSet<ZhNote> = HashSet::new();
     for i in 0..fields_info.amount {
         let note_type_id = *fields_info.note_ids.get(i).unwrap();
         let field_index = *fields_info.zh_field_indexes.get(i).unwrap() as usize;
-        let active_deck_ids_str = id_vec_to_sql_set(active_deck_ids);
-        let non_active_deck_ids_str = id_vec_to_sql_set(non_active_deck_ids);
-
-        let sql_select_template = "SELECT notes.flds FROM notes JOIN cards \
-            ON notes.id = cards.nid \
-            WHERE notes.mid = ?1 \
-            AND cards.did IN ({})";
-
-        let active_notes_query = conn.prepare(
-            sql_select_template
-                .replace("{}", &active_deck_ids_str)
-                .as_str(),
-        )?;
-        let active_words: Vec<String> =
-            select_note_sql_to_result(active_notes_query, note_type_id, field_index)?;
-        for word in active_words {
-            word_map.insert(word, true);
-        }
-
-        let non_active_notes_query = conn.prepare(
-            sql_select_template
-                .replace("{}", &non_active_deck_ids_str)
-                .as_str(),
-        )?;
-        let non_active_words: Vec<String> =
-            select_note_sql_to_result(non_active_notes_query, note_type_id, field_index)?;
-        // only mark words as inactive if they haven't been marked active before:
-        // all cards of a note need to be inactive for the note to count as inactive
-        for word in non_active_words {
-            if !word_map.contains_key(&word) {
-                word_map.insert(word, false);
-            }
-        }
+        all_notes.extend(select_notes(
+            conn,
+            note_type_id,
+            field_index,
+            NoteStatus::Active,
+        )?);
+        all_notes.extend(select_notes(
+            conn,
+            note_type_id,
+            field_index,
+            NoteStatus::SuspendedUnknown,
+        )?);
+        all_notes.extend(select_notes(
+            conn,
+            note_type_id,
+            field_index,
+            NoteStatus::SuspendedKnown,
+        )?);
     }
-    Ok(word_map
-        .into_iter()
-        .map(|(zh_word, is_active)| ZhNote { zh_word, is_active })
-        .collect())
+    Ok(all_notes)
 }
 
 /**
 -------------- PRIVATE ----------------
 */
+
 #[derive(Debug)]
 struct DecksWrapper {
     json_str: String,
@@ -96,16 +83,50 @@ struct ZhFieldsInfo {
     amount: usize,
 }
 
-fn select_note_sql_to_result(
-    mut stmt: Statement,
+const SELECT_ACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
+            ON notes.id = cards.nid \
+            WHERE notes.mid = ?1 \
+            AND cards.queue != -1 \
+            AND cards.ord = 0";
+
+const SELECT_INACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
+            ON notes.id = cards.nid \
+            WHERE notes.mid = ?1 \
+            AND cards.queue = -1 \
+            AND cards.flags = ?2 \
+            AND cards.ord = 0";
+
+fn select_notes(
+    conn: &Connection,
     note_type_id: i64,
     field_index: usize,
-) -> Result<Vec<String>, rusqlite::Error> {
-    stmt.query_map(params![note_type_id], |row| {
-        let fields_str: String = row.get(0)?;
-        Ok(fieldsstr_to_field(fields_str.as_str(), field_index))
-    })?
-    .collect::<Result<Vec<String>, _>>()
+    status: NoteStatus,
+) -> Result<Vec<ZhNote>, rusqlite::Error> {
+    let stmt_to_result = |mut stmt: Statement, status: NoteStatus, params: &[&dyn ToSql]| {
+        stmt.query_map(params, |row| {
+            let fields_str: String = row.get(0)?;
+            let zh_field: String = fieldsstr_to_field(fields_str.as_str(), field_index);
+            Ok(ZhNote { zh_field, status })
+        })?
+        .collect::<Result<Vec<ZhNote>, _>>()
+    };
+    match status {
+        NoteStatus::Active => {
+            let stmt = conn.prepare(SELECT_ACTIVE_SQL)?;
+            let params = params![note_type_id];
+            stmt_to_result(stmt, status, params)
+        }
+        NoteStatus::SuspendedUnknown => {
+            let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
+            let params = params![note_type_id, crate::SUSPENDED_UNKNOWN_FLAG];
+            stmt_to_result(stmt, status, params)
+        }
+        NoteStatus::SuspendedKnown => {
+            let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
+            let params = params![note_type_id, crate::SUSPENDED_KNOWN_FLAG];
+            stmt_to_result(stmt, status, params)
+        }
+    }
 }
 
 /// given a vector of i64 e.g [i1, i2, i3] return single string "<i1>, <i2>, <i3>"

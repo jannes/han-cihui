@@ -7,6 +7,7 @@ extern crate serde_json;
 pub enum AppError {
     DBError(rusqlite::Error),
     JSONError(serde_json::Error),
+    IOError(std::io::Error),
 }
 
 impl From<rusqlite::Error> for AppError {
@@ -21,8 +22,8 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
-// impl From<std::option::NoneError> for AppError {
-//     fn from(error: std::option::NoneError) -> Self {
-//         AppError::NoneError(error)
-//     }
-// }
+impl From<std::io::Error> for AppError {
+    fn from(error: std::io::Error) -> Self {
+        AppError::IOError(error)
+    }
+}
