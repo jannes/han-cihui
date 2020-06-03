@@ -6,7 +6,9 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{params, Connection, NO_PARAMS};
 
 use crate::anki_access::{NoteStatus, ZhNote};
-use crate::persistence::{add_external_words, insert_overwrite, select_all, Vocab, VocabStatus};
+use crate::persistence::{
+    add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
+};
 use clap::{App, Arg, SubCommand};
 use errors::AppError;
 use persistence::create_table;
@@ -49,6 +51,7 @@ fn main() -> Result<(), AppError> {
                         .help("print anki statistics only"),
                 ),
         )
+        .subcommand(SubCommand::with_name("show").about("prints words"))
         .get_matches();
 
     let data_conn: Connection;
@@ -79,6 +82,13 @@ fn main() -> Result<(), AppError> {
             } else {
                 print_stats(&data_conn)
             }
+        }
+        Some("show") => {
+            let known_words = select_known(&data_conn)?;
+            for word in known_words {
+                println!("{}", word);
+            }
+            Ok(())
         }
         _ => no_subcommand_behavior(),
     }

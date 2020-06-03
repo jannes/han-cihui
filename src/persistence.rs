@@ -61,6 +61,18 @@ pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>, AppError> {
     Ok(vocab?.into_iter().collect())
 }
 
+pub fn select_known(conn: &Connection) -> Result<Vec<String>, AppError> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT (word) FROM words WHERE status != {}",
+        STATUS_SUSPENDED_UNKNOWN
+    ))?;
+    // can not collect as hash set somehow?
+    let known_words = stmt
+        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))?
+        .collect::<Result<Vec<String>, _>>()?;
+    Ok(known_words)
+}
+
 fn int_to_status(status: i64) -> Option<VocabStatus> {
     match status {
         STATUS_ACTIVE => Some(VocabStatus::Active),
