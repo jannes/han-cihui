@@ -174,8 +174,7 @@ fn get_zh_fields_info(
                 let field_object = field.as_object().unwrap();
                 let field_name = field_object.get("name").unwrap().as_str().unwrap();
                 if *target_field == field_name {
-                    let node_id_str = note.get("id").unwrap().as_str().unwrap();
-                    let note_id_int: i64 = node_id_str.parse().unwrap();
+                    let note_id_int: i64 = note.get("id").unwrap().as_i64().unwrap();
                     let field_index = field_object.get("ord").unwrap().as_i64().unwrap();
                     note_ids.push(note_id_int);
                     zh_field_indexes.push(field_index);
