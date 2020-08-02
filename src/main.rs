@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate clap;
 extern crate rusqlite;
 
@@ -17,6 +19,7 @@ use std::path::Path;
 
 mod anki_access;
 mod errors;
+mod extraction;
 mod persistence;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";

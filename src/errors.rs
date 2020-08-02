@@ -8,6 +8,7 @@ pub enum AppError {
     DBError(rusqlite::Error),
     JSONError(serde_json::Error),
     IOError(std::io::Error),
+    EpubParseError(String),
 }
 
 impl From<rusqlite::Error> for AppError {
