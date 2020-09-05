@@ -1,13 +1,22 @@
+extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate prettytable;
-extern crate clap;
 extern crate rusqlite;
 
 use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::path::Path;
 
-use rusqlite::{params, Connection, NO_PARAMS};
+use clap::{App, Arg, SubCommand};
+use prettytable::Table;
+use rusqlite::Connection;
+use unicode_segmentation::UnicodeSegmentation;
+
+use errors::AppError;
+use extraction::open_as_book;
+use persistence::create_table;
 
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::errors::AppError::InvalidCLIArgument;
@@ -15,14 +24,6 @@ use crate::extraction::{extract_vocabulary, word_to_hanzi, ExtractionItem};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
-use clap::{App, Arg, SubCommand};
-use errors::AppError;
-use extraction::open_as_book;
-use persistence::create_table;
-use prettytable::{Row, Table};
-use std::fs;
-use std::path::Path;
-use unicode_segmentation::UnicodeSegmentation;
 
 mod anki_access;
 mod errors;
@@ -118,7 +119,7 @@ fn main() -> Result<(), AppError> {
             let subcommand_matches = matches.subcommand_matches("extract").unwrap();
             let filename = subcommand_matches.value_of("filename").unwrap();
             let min_occurence = subcommand_matches.value_of("min_occurrence").unwrap();
-            let min_occ: u64 = min_occurence.parse().map_err(|e| {
+            let min_occ: u64 = min_occurence.parse().map_err(|_e| {
                 InvalidCLIArgument("min_occurence must positive number".to_string())
             })?;
             if min_occ < 1 {
@@ -175,7 +176,7 @@ fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Res
         .char_freq_map
         .iter()
         .map(|(k, v)| (k.as_str(), *v))
-        .filter(|(k, v)| !known_chars.contains(k))
+        .filter(|(k, _v)| !known_chars.contains(k))
         .collect();
     let amount_unknown_words: u64 = unknown_voc.iter().map(|item| item.frequency).sum();
     let amount_unknown_chars: u64 = unknown_char.iter().map(|(_k, v)| v).sum();
@@ -193,7 +194,7 @@ fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Res
 
     let char_freq_min_occur: HashMap<String, u64> =
         ext_item_set_to_char_freq(&vocabulary_min_occurring);
-    let total_char_min_occur: u64 = char_freq_min_occur.iter().map(|(char, freq)| freq).sum();
+    let total_char_min_occur: u64 = char_freq_min_occur.iter().map(|(_char, freq)| freq).sum();
 
     let unknown_voc_min_occ: HashSet<&ExtractionItem> = vocabulary_min_occurring
         .iter()
@@ -205,12 +206,14 @@ fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Res
 
     let unknown_char_min_occur: HashMap<&String, u64> = char_freq_min_occur
         .iter()
-        .filter(|(hanzi, freq)| !known_chars.contains(hanzi.as_str()))
+        .filter(|(hanzi, _freq)| !known_chars.contains(hanzi.as_str()))
         .map(|(hanzi, freq)| (hanzi, *freq))
         .collect();
 
-    let total_unknown_char_min_occur: u64 =
-        unknown_char_min_occur.iter().map(|(char, freq)| freq).sum();
+    let total_unknown_char_min_occur: u64 = unknown_char_min_occur
+        .iter()
+        .map(|(_char, freq)| freq)
+        .sum();
 
     let mut table = Table::new();
     table.add_row(row!["", "all", format!("min {}", min_occ)]);

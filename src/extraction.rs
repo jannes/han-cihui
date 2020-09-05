@@ -1,14 +1,14 @@
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+
 use epub::doc::{EpubDoc, NavPoint};
 use jieba_rs::Jieba;
-use scraper::{Html, Selector};
+use regex::Regex;
+use scraper::Html;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::errors::AppError;
 use crate::errors::AppError::EpubParseError;
-use regex::Regex;
-use std::collections::{HashMap, HashSet};
-use std::iter::Map;
-use std::path::{Path, PathBuf};
-use unicode_segmentation::{UnicodeSegmentation, UnicodeSentences};
 
 pub struct Chapter {
     pub(crate) title: String,
@@ -43,7 +43,7 @@ pub struct ExtractionResult {
 
 pub fn open_as_book(filename: &str) -> Result<Book, AppError> {
     let edoc = EpubDoc::new(filename)
-        .map_err(|e| EpubParseError(format!("failed to create EpubDoc for {}", filename)))?;
+        .map_err(|_e| EpubParseError(format!("failed to create EpubDoc for {}", filename)))?;
     get_book_from_edoc(edoc)
 }
 
@@ -82,7 +82,7 @@ pub fn extract_vocabulary<'a>(book: &'a Book) -> ExtractionResult {
     let mut char_freq_map: HashMap<String, u64> = HashMap::new();
     let zh_word_occurrences: Vec<(&str, String)> = word_occurences
         .into_iter()
-        .filter(|(w, l)| contains_hanzi(w))
+        .filter(|(w, _l)| contains_hanzi(w))
         .collect();
     for (word, location) in zh_word_occurrences {
         let frequency = *word_frequencies.get(word).unwrap();
@@ -124,6 +124,7 @@ pub fn word_to_hanzi(word: &str) -> Vec<&str> {
     UnicodeSegmentation::graphemes(word, true).collect::<Vec<&str>>()
 }
 
+#[allow(dead_code)]
 fn extract_from_string(s: &str) -> Vec<&str> {
     Jieba::new().cut(s, false)
 }

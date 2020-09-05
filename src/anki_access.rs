@@ -25,6 +25,7 @@ pub struct ZhNote {
     pub status: NoteStatus,
 }
 
+#[allow(dead_code)]
 pub fn get_decks(conn: &Connection) -> Result<Vec<Deck>, AppError> {
     let mut example_query = conn.prepare("SELECT decks FROM col")?;
     let mut cols = example_query.query_map(NO_PARAMS, |row| {
@@ -129,6 +130,7 @@ fn select_notes(
     }
 }
 
+#[allow(dead_code)]
 /// given a vector of i64 e.g [i1, i2, i3] return single string "<i1>, <i2>, <i3>"
 fn id_vec_to_sql_set(ids: &Vec<i64>) -> String {
     match ids.get(0) {
@@ -190,6 +192,7 @@ fn get_zh_fields_info(
     })
 }
 
+#[allow(dead_code)]
 fn jsondecks_to_decks(json_str: String) -> Result<Vec<Deck>, serde_json::Error> {
     let parsed_json: Value = serde_json::from_str(json_str.as_str())?;
     let arr = parsed_json.as_object();
@@ -199,6 +202,7 @@ fn jsondecks_to_decks(json_str: String) -> Result<Vec<Deck>, serde_json::Error> 
     }
 }
 
+#[allow(dead_code)]
 fn jsondeck_to_deck(json_deck: &Value) -> Result<Deck, serde_json::Error> {
     Ok(Deck {
         id: json_deck.get("id").unwrap().as_i64().unwrap(),

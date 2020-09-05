@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use rusqlite::{params, Connection, Statement, NO_PARAMS};
+use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::HashSet;
 
 const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status integer not null);\
