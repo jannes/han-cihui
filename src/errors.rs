@@ -9,6 +9,7 @@ pub enum AppError {
     JSONError(serde_json::Error),
     IOError(std::io::Error),
     EpubParseError(String),
+    InvalidCLIArgument(String),
 }
 
 impl From<rusqlite::Error> for AppError {

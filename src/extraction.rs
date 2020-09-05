@@ -5,46 +5,49 @@ use scraper::{Html, Selector};
 use crate::errors::AppError;
 use crate::errors::AppError::EpubParseError;
 use regex::Regex;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::iter::Map;
 use std::path::{Path, PathBuf};
+use unicode_segmentation::{UnicodeSegmentation, UnicodeSentences};
 
-struct Chapter {
-    title: String,
-    content: String,
-    index: u32,
+pub struct Chapter {
+    pub(crate) title: String,
+    pub(crate) content: String,
+    pub(crate) index: u32,
 }
 impl Chapter {
-    fn get_numbered_title(&self) -> String {
+    pub fn get_numbered_title(&self) -> String {
         format!("{:04}-{}", self.index, self.title)
     }
 }
-struct Book {
-    title: String,
-    author: String,
-    chapters: Vec<Chapter>,
+pub struct Book {
+    pub(crate) title: String,
+    pub(crate) author: String,
+    pub(crate) chapters: Vec<Chapter>,
 }
 
-struct ExtractionItem {
-    word: String,
-    frequency: u64,
-    location: String,
+#[derive(PartialEq, Eq, Hash)]
+pub struct ExtractionItem {
+    pub(crate) word: String,
+    pub(crate) frequency: u64,
+    pub(crate) location: String,
 }
 
-struct ExtractionResult {
-    word_count: u64,
-    character_count: u64,
-    vocabulary_info: Vec<ExtractionItem>,
+pub struct ExtractionResult {
+    pub(crate) word_count: u64,
+    pub(crate) character_count: u64,
+    pub(crate) vocabulary_info: HashSet<ExtractionItem>,
+    // char is always 4 bytes unicode scalar, not necessarily an actual full character
+    pub(crate) char_freq_map: HashMap<String, u64>,
 }
 
-fn contains_hanzi(word: &str) -> bool {
-    lazy_static! {
-        static ref HAN_RE: Regex = Regex::new(r"\p{Han}").unwrap();
-    }
-    HAN_RE.is_match(word)
+pub fn open_as_book(filename: &str) -> Result<Book, AppError> {
+    let edoc = EpubDoc::new(filename)
+        .map_err(|e| EpubParseError(format!("failed to create EpubDoc for {}", filename)))?;
+    get_book_from_edoc(edoc)
 }
 
-fn extract_vocabulary<'a>(book: &'a Book) -> ExtractionResult {
+pub fn extract_vocabulary<'a>(book: &'a Book) -> ExtractionResult {
     if book.chapters.len() < 1 {
         panic!("expected book with at least one chapter!");
     }
@@ -75,7 +78,8 @@ fn extract_vocabulary<'a>(book: &'a Book) -> ExtractionResult {
 
     let mut word_count: u64 = 0;
     let mut character_count: u64 = 0;
-    let mut extraction_items: Vec<ExtractionItem> = Vec::new();
+    let mut extraction_items: HashSet<ExtractionItem> = HashSet::new();
+    let mut char_freq_map: HashMap<String, u64> = HashMap::new();
     let zh_word_occurrences: Vec<(&str, String)> = word_occurences
         .into_iter()
         .filter(|(w, l)| contains_hanzi(w))
@@ -83,36 +87,45 @@ fn extract_vocabulary<'a>(book: &'a Book) -> ExtractionResult {
     for (word, location) in zh_word_occurrences {
         let frequency = *word_frequencies.get(word).unwrap();
         word_count += frequency;
-        character_count += frequency * (word.len() as u64);
+        let characters = word_to_hanzi(word);
+        for character in characters {
+            character_count += frequency;
+            if char_freq_map.contains_key(character) {
+                let v = char_freq_map.get_mut(character).unwrap();
+                *v += frequency;
+            } else {
+                char_freq_map.insert(character.to_string(), frequency);
+            }
+        }
         let extraction_item = ExtractionItem {
             word: word.to_string(),
             frequency,
             location,
         };
-        extraction_items.push(extraction_item);
+        extraction_items.insert(extraction_item);
     }
 
     return ExtractionResult {
         word_count,
         character_count,
         vocabulary_info: extraction_items,
+        char_freq_map,
     };
+}
+
+pub fn contains_hanzi(word: &str) -> bool {
+    lazy_static! {
+        static ref HAN_RE: Regex = Regex::new(r"\p{Han}").unwrap();
+    }
+    HAN_RE.is_match(word)
+}
+
+pub fn word_to_hanzi(word: &str) -> Vec<&str> {
+    UnicodeSegmentation::graphemes(word, true).collect::<Vec<&str>>()
 }
 
 fn extract_from_string(s: &str) -> Vec<&str> {
     Jieba::new().cut(s, false)
-}
-
-fn open_as_book(filename: &str) -> Result<Book, AppError> {
-    let edoc = EpubDoc::new(filename)
-        .map_err(|e| EpubParseError(format!("failed to create EpubDoc for {}", filename)))?;
-    // edoc.toc
-    //     .iter()
-    //     .for_each(|navp| println!("{}", navp.content.as_path().to_str().unwrap()));
-    // for (key, val) in edoc.resources.iter() {
-    //     println!("key: {} val: {}", key, val.0.to_str().unwrap());
-    // }
-    get_book_from_edoc(edoc)
 }
 
 fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &PathBuf) -> Option<NavPoint> {

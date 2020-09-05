@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate prettytable;
 extern crate clap;
 extern crate rusqlite;
 
@@ -8,14 +10,19 @@ use std::collections::{HashMap, HashSet};
 use rusqlite::{params, Connection, NO_PARAMS};
 
 use crate::anki_access::{NoteStatus, ZhNote};
+use crate::errors::AppError::InvalidCLIArgument;
+use crate::extraction::{extract_vocabulary, word_to_hanzi, ExtractionItem};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
 use clap::{App, Arg, SubCommand};
 use errors::AppError;
+use extraction::open_as_book;
 use persistence::create_table;
+use prettytable::{Row, Table};
 use std::fs;
 use std::path::Path;
+use unicode_segmentation::UnicodeSegmentation;
 
 mod anki_access;
 mod errors;
@@ -54,7 +61,21 @@ fn main() -> Result<(), AppError> {
                         .help("print anki statistics only"),
                 ),
         )
-        .subcommand(SubCommand::with_name("show").about("prints words"))
+        .subcommand(
+            SubCommand::with_name("extract")
+                .about("extract vocabulary from epub")
+                .arg(
+                    Arg::with_name("filename")
+                        .required(true)
+                        .help("path to epub file, from which to extract vocabulary"),
+                )
+                .arg(
+                    Arg::with_name("min_occurrence")
+                        .required(true)
+                        .help("the minimum amount a word should occur to be extracted"),
+                ),
+        )
+        .subcommand(SubCommand::with_name("show").about("prints all known words"))
         .get_matches();
 
     let data_conn: Connection;
@@ -93,8 +114,149 @@ fn main() -> Result<(), AppError> {
             }
             Ok(())
         }
+        Some("extract") => {
+            let subcommand_matches = matches.subcommand_matches("extract").unwrap();
+            let filename = subcommand_matches.value_of("filename").unwrap();
+            let min_occurence = subcommand_matches.value_of("min_occurrence").unwrap();
+            let min_occ: u64 = min_occurence.parse().map_err(|e| {
+                InvalidCLIArgument("min_occurence must positive number".to_string())
+            })?;
+            if min_occ < 1 {
+                return Err(AppError::InvalidCLIArgument(
+                    "min_occurence must be positive number".to_string(),
+                ));
+            }
+            let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
+            do_extract(filename, min_occ, known_words)
+        }
         _ => no_subcommand_behavior(),
     }
+}
+
+fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<String, u64> {
+    let mut char_freq_map: HashMap<String, u64> = HashMap::new();
+    ext_items
+        .iter()
+        .map(|item| (word_to_hanzi(&item.word), item.frequency))
+        .for_each(|(hanzis, frequency)| {
+            for hanzi in hanzis {
+                if char_freq_map.contains_key(hanzi) {
+                    let v = char_freq_map.get_mut(hanzi).unwrap();
+                    *v += frequency;
+                } else {
+                    char_freq_map.insert(hanzi.to_string(), frequency);
+                }
+            }
+        });
+    char_freq_map
+}
+
+fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Result<(), AppError> {
+    let known_chars: HashSet<&str> = known_words
+        .iter()
+        .flat_map(|word| word_to_hanzi(&word))
+        .collect();
+
+    let book = open_as_book(filename)?;
+    println!(
+        "extracting vocabulary from {} by {}",
+        book.title, book.author
+    );
+    let extraction_res = extract_vocabulary(&book);
+    /* ALL WORDS */
+    let amount_unique_words = extraction_res.vocabulary_info.len();
+    let amount_unique_chars = extraction_res.char_freq_map.len();
+    let unknown_voc: HashSet<&ExtractionItem> = extraction_res
+        .vocabulary_info
+        .iter()
+        .filter(|item| !known_words.contains(&item.word))
+        .collect();
+    let unknown_char: HashMap<&str, u64> = extraction_res
+        .char_freq_map
+        .iter()
+        .map(|(k, v)| (k.as_str(), *v))
+        .filter(|(k, v)| !known_chars.contains(k))
+        .collect();
+    let amount_unknown_words: u64 = unknown_voc.iter().map(|item| item.frequency).sum();
+    let amount_unknown_chars: u64 = unknown_char.iter().map(|(_k, v)| v).sum();
+
+    /* MIN OCCURRING WORDS */
+    let vocabulary_min_occurring: HashSet<&ExtractionItem> = extraction_res
+        .vocabulary_info
+        .iter()
+        .filter(|item| item.frequency >= min_occ)
+        .collect();
+    let total_min_occurring_words: u64 = vocabulary_min_occurring
+        .iter()
+        .map(|item| item.frequency)
+        .sum();
+
+    let char_freq_min_occur: HashMap<String, u64> =
+        ext_item_set_to_char_freq(&vocabulary_min_occurring);
+    let total_char_min_occur: u64 = char_freq_min_occur.iter().map(|(char, freq)| freq).sum();
+
+    let unknown_voc_min_occ: HashSet<&ExtractionItem> = vocabulary_min_occurring
+        .iter()
+        .map(|item| *item)
+        .filter(|item| !known_words.contains(&item.word))
+        .collect();
+    let total_unknown_min_occur_words: u64 =
+        unknown_voc_min_occ.iter().map(|item| item.frequency).sum();
+
+    let unknown_char_min_occur: HashMap<&String, u64> = char_freq_min_occur
+        .iter()
+        .filter(|(hanzi, freq)| !known_chars.contains(hanzi.as_str()))
+        .map(|(hanzi, freq)| (hanzi, *freq))
+        .collect();
+
+    let total_unknown_char_min_occur: u64 =
+        unknown_char_min_occur.iter().map(|(char, freq)| freq).sum();
+
+    let mut table = Table::new();
+    table.add_row(row!["", "all", format!("min {}", min_occ)]);
+    table.add_row(row![
+        "total amount words",
+        extraction_res.word_count,
+        total_min_occurring_words
+    ]);
+    table.add_row(row![
+        "total amount unknown words",
+        amount_unknown_words,
+        total_unknown_min_occur_words
+    ]);
+    table.add_row(row![
+        "total amount characters",
+        extraction_res.character_count,
+        total_char_min_occur
+    ]);
+    table.add_row(row![
+        "total amount unknown characters",
+        amount_unknown_chars,
+        total_unknown_char_min_occur
+    ]);
+    table.add_row(row![
+        "amount unique words",
+        amount_unique_words,
+        vocabulary_min_occurring.len()
+    ]);
+    table.add_row(row![
+        "amount unknown unique words",
+        unknown_voc.len(),
+        unknown_voc_min_occ.len()
+    ]);
+    table.add_row(row![
+        "amount unique characters",
+        amount_unique_chars,
+        char_freq_min_occur.len()
+    ]);
+    table.add_row(row![
+        "amount unknown unique characters",
+        unknown_char.len(),
+        unknown_char_min_occur.len()
+    ]);
+    table.printstd();
+
+    Ok(())
 }
 
 fn no_subcommand_behavior() -> Result<(), AppError> {
@@ -116,16 +278,18 @@ fn print_stats(data_conn: &Connection) -> Result<(), AppError> {
             VocabStatus::AddedExternal => &inactive.insert(vocab.word),
         };
     }
-    let mut active_or_known_characters = HashSet::new();
-    let mut inactive_characters = HashSet::new();
+    let mut active_or_known_characters: HashSet<&str> = HashSet::new();
+    let mut inactive_characters: HashSet<&str> = HashSet::new();
     for word in &active.union(&suspended_known).collect::<Vec<&String>>() {
-        for char in word.chars() {
+        let chars: Vec<&str> = UnicodeSegmentation::graphemes(word.as_str(), true).collect();
+        for char in chars {
             active_or_known_characters.insert(char);
         }
     }
     for word in &inactive.union(&suspended_unknown).collect::<Vec<&String>>() {
-        for char in word.chars() {
-            if !active_or_known_characters.contains(&char) {
+        let chars: Vec<&str> = UnicodeSegmentation::graphemes(word.as_str(), true).collect();
+        for char in chars {
+            if !active_or_known_characters.contains(char) {
                 inactive_characters.insert(char);
             }
         }
