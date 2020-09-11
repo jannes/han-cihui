@@ -15,20 +15,23 @@ use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
 use errors::AppError;
-use extraction::open_as_book;
 use persistence::create_table;
 
 use crate::anki_access::{NoteStatus, ZhNote};
+use crate::ebook::open_as_book;
 use crate::errors::AppError::InvalidCLIArgument;
-use crate::extraction::{extract_vocabulary, word_to_hanzi, ExtractionItem};
+use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
+use jieba_rs::Jieba;
 
 mod anki_access;
+mod ebook;
 mod errors;
 mod extraction;
 mod persistence;
+mod python_interop;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";
 const DATA_PATH: &str = "/Users/jannes/.zhvocab/data.db";
@@ -74,7 +77,12 @@ fn main() -> Result<(), AppError> {
                     Arg::with_name("min_occurrence")
                         .required(true)
                         .help("the minimum amount a word should occur to be extracted"),
-                ),
+                )
+                .arg(Arg::with_name("save as json")
+                    .required(false)
+                    .long("save-json")
+                    .help("save words with minimum occurrence as json array with per chapter vocab"),
+                )
         )
         .subcommand(SubCommand::with_name("show").about("prints all known words"))
         .get_matches();
@@ -128,7 +136,10 @@ fn main() -> Result<(), AppError> {
                 ));
             }
             let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
-            do_extract(filename, min_occ, known_words)
+            match subcommand_matches.value_of("save as json") {
+                Some(outpath) => do_extract(filename, min_occ, known_words, Some(outpath)),
+                None => do_extract(filename, min_occ, known_words, None),
+            }
         }
         _ => no_subcommand_behavior(),
     }
@@ -152,18 +163,48 @@ fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<St
     char_freq_map
 }
 
-fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Result<(), AppError> {
-    let known_chars: HashSet<&str> = known_words
-        .iter()
-        .flat_map(|word| word_to_hanzi(&word))
-        .collect();
-
+fn do_extract(
+    filename: &str,
+    min_occ: u64,
+    known_words: HashSet<String>,
+    json_outpath: Option<&str>,
+) -> Result<(), AppError> {
     let book = open_as_book(filename)?;
     println!(
         "extracting vocabulary from {} by {}",
         book.title, book.author
     );
-    let extraction_res = extract_vocabulary(&book);
+    let extraction_res = extract_vocab(&book, &Jieba::new());
+    let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
+    match json_outpath {
+        Some(outpath) => {
+            let mut chapter_vocabulary: HashMap<String, HashSet<&ExtractionItem>> = book
+                .chapters
+                .iter()
+                .map(|chapter| (chapter.get_numbered_title(), HashSet::new()))
+                .collect();
+            for item in filtered_extraction_set {
+                chapter_vocabulary
+                    .get_mut(&item.location)
+                    .unwrap()
+                    .insert(item);
+            }
+        }
+        None => {}
+    }
+
+    Ok(())
+}
+
+fn do_extraction_analysis(
+    extraction_res: &ExtractionResult,
+    min_occ: u64,
+    known_words: HashSet<String>,
+) -> HashSet<&ExtractionItem> {
+    let known_chars: HashSet<&str> = known_words
+        .iter()
+        .flat_map(|word| word_to_hanzi(&word))
+        .collect();
     /* ALL WORDS */
     let amount_unique_words = extraction_res.vocabulary_info.len();
     let amount_unique_chars = extraction_res.char_freq_map.len();
@@ -258,8 +299,7 @@ fn do_extract(filename: &str, min_occ: u64, known_words: HashSet<String>) -> Res
         unknown_char_min_occur.len()
     ]);
     table.printstd();
-
-    Ok(())
+    unknown_voc_min_occ
 }
 
 fn no_subcommand_behavior() -> Result<(), AppError> {

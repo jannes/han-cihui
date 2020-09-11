@@ -409,6 +409,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aaf91faf136cb47367fa430cd46e37a788775e7fa104f8b4bcb3861dc389b724"
 
 [[package]]
+name = "han-cihui"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "epub",
+ "jieba-rs",
+ "lazy_static",
+ "prettytable-rs",
+ "regex",
+ "rusqlite",
+ "scraper",
+ "serde_json",
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1097,22 +1113,6 @@ name = "xml-rs"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b07db065a5cf61a7e4ba64f29e67db906fb1787316516c4e6e5ff0fea1efcd8a"
-
-[[package]]
-name = "zh_vocab"
-version = "0.1.0"
-dependencies = [
- "clap",
- "epub",
- "jieba-rs",
- "lazy_static",
- "prettytable-rs",
- "regex",
- "rusqlite",
- "scraper",
- "serde_json",
- "unicode-segmentation",
-]
 
 [[package]]
 name = "zip"
