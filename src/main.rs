@@ -16,15 +16,17 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use errors::AppError;
 use persistence::create_table;
+use serde_json::{json, to_writer_pretty, Value};
 
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::ebook::open_as_book;
 use crate::errors::AppError::InvalidCLIArgument;
-use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult};
+use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult, Pkuseg};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
 use jieba_rs::Jieba;
+use std::fs::File;
 
 mod anki_access;
 mod ebook;
@@ -81,6 +83,7 @@ fn main() -> Result<(), AppError> {
                 .arg(Arg::with_name("save as json")
                     .required(false)
                     .long("save-json")
+                    .takes_value(true)
                     .help("save words with minimum occurrence as json array with per chapter vocab"),
                 )
         )
@@ -172,23 +175,42 @@ fn do_extract(
     let book = open_as_book(filename)?;
     println!(
         "extracting vocabulary from {} by {}",
-        book.title, book.author
+        &book.title, &book.author
     );
-    let extraction_res = extract_vocab(&book, &Jieba::new());
+    let extraction_res = extract_vocab(&book, &Pkuseg {});
     let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
     match json_outpath {
         Some(outpath) => {
-            let mut chapter_vocabulary: HashMap<String, HashSet<&ExtractionItem>> = book
+            let chapter_titles: Vec<String> = book
                 .chapters
                 .iter()
-                .map(|chapter| (chapter.get_numbered_title(), HashSet::new()))
+                .map(|chapter| chapter.get_numbered_title())
+                .collect();
+            let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
+                .iter()
+                .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
                 .collect();
             for item in filtered_extraction_set {
                 chapter_vocabulary
-                    .get_mut(&item.location)
+                    .get_mut(item.location.as_str())
                     .unwrap()
                     .insert(item);
             }
+            let chapter_jsons: Vec<Value> = chapter_titles
+                .iter()
+                .map(|chapter_title| {
+                    json!({
+                    "title": chapter_title,
+                    "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
+                    .map(|item| item.word.as_str()).collect::<Vec<&str>>()
+                    })
+                })
+                .collect();
+            let output_json = json!({
+                "title": &book.title,
+                "vocabulary": chapter_jsons
+            });
+            to_writer_pretty(&File::create(outpath)?, &output_json)?;
         }
         None => {}
     }

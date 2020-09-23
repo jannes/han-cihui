@@ -2,8 +2,10 @@ use crate::errors::AppError;
 use crate::errors::AppError::EpubParseError;
 use epub::doc::{EpubDoc, NavPoint};
 use scraper::Html;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+#[derive(Serialize, Deserialize)]
 pub struct Chapter {
     pub(crate) title: String,
     pub(crate) content: String,
@@ -15,10 +17,11 @@ impl Chapter {
         format!("{:04}-{}", self.index, self.title)
     }
     pub fn as_json(&self) -> String {
-        unimplemented!()
+        serde_json::to_string(self).unwrap()
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Book {
     pub(crate) title: String,
     pub(crate) author: String,
@@ -27,7 +30,7 @@ pub struct Book {
 
 impl Book {
     pub fn as_json(&self) -> String {
-        unimplemented!()
+        serde_json::to_string(self).unwrap()
     }
 }
 
@@ -142,6 +145,8 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
 
 #[cfg(test)]
 mod tests {
+    use crate::ebook::{open_as_book, Book, Chapter};
+
     #[test]
     fn parse_epub() {
         let book = open_as_book("test_resources/xusanguan.epub").unwrap();
@@ -156,5 +161,22 @@ mod tests {
             .content
             .contains("许三观是城里丝厂的送茧工，这一天他回到村里来看望他的爷爷。"));
         assert_eq!(book.chapters.get(34).unwrap().title, "第二十九章");
+    }
+
+    #[test]
+    fn book_to_json() {
+        let chapter = Chapter {
+            title: "一".to_string(),
+            content: "这是第一章".to_string(),
+            index: 1,
+        };
+
+        let book = Book {
+            title: "欢乐英雄".to_string(),
+            author: "古龙".to_string(),
+            chapters: vec![chapter],
+        };
+
+        assert_eq!("{\"title\":\"欢乐英雄\"", &book.as_json()[0..23]);
     }
 }
