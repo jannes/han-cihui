@@ -132,10 +132,10 @@ fn select_notes(
 
 #[allow(dead_code)]
 /// given a vector of i64 e.g [i1, i2, i3] return single string "<i1>, <i2>, <i3>"
-fn id_vec_to_sql_set(ids: &Vec<i64>) -> String {
+fn id_vec_to_sql_set(ids: &[i64]) -> String {
     match ids.get(0) {
         Some(i) => ids[1..]
-            .into_iter()
+            .iter()
             .fold(i.to_string(), |acc, &i2| acc + ", " + &i2.to_string()),
         None => String::new(),
     }

@@ -13,9 +13,8 @@ pub fn run_python(program_str: &str) -> String {
     };
 
     let stdin = process.stdin.as_mut().unwrap();
-    match stdin.write(program_str.as_bytes()) {
-        Err(why) => panic!("couldn't write to python stdin: {}", why),
-        Ok(_) => {}
+    if let Err(why) = stdin.write(program_str.as_bytes()) {
+        panic!("couldn't write to python stdin: {}", why)
     }
 
     let output = match process.wait_with_output() {

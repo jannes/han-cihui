@@ -25,7 +25,6 @@ use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, Extraction
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
-use jieba_rs::Jieba;
 use std::fs::File;
 
 mod anki_access;
@@ -179,40 +178,37 @@ fn do_extract(
     );
     let extraction_res = extract_vocab(&book, &Pkuseg {});
     let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
-    match json_outpath {
-        Some(outpath) => {
-            let chapter_titles: Vec<String> = book
-                .chapters
-                .iter()
-                .map(|chapter| chapter.get_numbered_title())
-                .collect();
-            let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
-                .iter()
-                .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
-                .collect();
-            for item in filtered_extraction_set {
-                chapter_vocabulary
-                    .get_mut(item.location.as_str())
-                    .unwrap()
-                    .insert(item);
-            }
-            let chapter_jsons: Vec<Value> = chapter_titles
-                .iter()
-                .map(|chapter_title| {
-                    json!({
-                    "title": chapter_title,
-                    "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
-                    .map(|item| item.word.as_str()).collect::<Vec<&str>>()
-                    })
-                })
-                .collect();
-            let output_json = json!({
-                "title": &book.title,
-                "vocabulary": chapter_jsons
-            });
-            to_writer_pretty(&File::create(outpath)?, &output_json)?;
+    if let Some(outpath) = json_outpath {
+        let chapter_titles: Vec<String> = book
+            .chapters
+            .iter()
+            .map(|chapter| chapter.get_numbered_title())
+            .collect();
+        let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
+            .iter()
+            .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
+            .collect();
+        for item in filtered_extraction_set {
+            chapter_vocabulary
+                .get_mut(item.location.as_str())
+                .unwrap()
+                .insert(item);
         }
-        None => {}
+        let chapter_jsons: Vec<Value> = chapter_titles
+            .iter()
+            .map(|chapter_title| {
+                json!({
+                "title": chapter_title,
+                "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
+                .map(|item| item.word.as_str()).collect::<Vec<&str>>()
+                })
+            })
+            .collect();
+        let output_json = json!({
+            "title": &book.title,
+            "vocabulary": chapter_jsons
+        });
+        to_writer_pretty(&File::create(outpath)?, &output_json)?;
     }
 
     Ok(())
@@ -261,7 +257,7 @@ fn do_extraction_analysis(
 
     let unknown_voc_min_occ: HashSet<&ExtractionItem> = vocabulary_min_occurring
         .iter()
-        .map(|item| *item)
+        .copied()
         .filter(|item| !known_words.contains(&item.word))
         .collect();
     let total_unknown_min_occur_words: u64 =
@@ -404,7 +400,7 @@ fn print_anki_stats() -> Result<(), AppError> {
 fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<(), AppError> {
     let file_str = fs::read_to_string(filename)?;
     let words_to_add: HashSet<String> = file_str
-        .split("\n")
+        .split('\n')
         .map(|line| String::from(line.trim()))
         .collect();
     let words_known: HashSet<String> = select_all(data_conn)?
@@ -460,6 +456,6 @@ fn notes_to_words_filtered(notes: &HashSet<ZhNote>, status: NoteStatus) -> HashS
 fn zh_field_to_words(field: &str) -> Vec<String> {
     field
         .split(&WORD_DELIMITERS[..])
-        .map(|s| String::from(s))
+        .map(String::from)
         .collect()
 }

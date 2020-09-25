@@ -38,7 +38,7 @@ pub fn add_external_words(conn: &Connection, words: &HashSet<&str>) -> Result<()
     Ok(())
 }
 
-pub fn insert_overwrite(conn: &Connection, vocab: &Vec<Vocab>) -> Result<(), AppError> {
+pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<(), AppError> {
     for item in vocab {
         let word = &item.word;
         let status_int = status_to_int(&item.status);

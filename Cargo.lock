@@ -312,9 +312,8 @@ checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "epub"
-version = "1.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a262c3a7f8e916c61cf659bf1d449b1fd997ccf696cec2803f2a72cf0d3b25b"
+version = "1.2.1"
+source = "git+https://github.com/jannes/epub-rs?branch=v1.2.1-allow_missing_play_order#642499b7adcd91934f061d313717542fed8df034"
 dependencies = [
  "failure",
  "percent-encoding",

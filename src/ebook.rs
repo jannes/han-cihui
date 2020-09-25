@@ -51,18 +51,17 @@ fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &PathBuf) -> Option<NavP
                 .contains(resource_path.to_str().unwrap())
         })
         .collect();
-    if matches.len() > 1 {
-        panic!(
-            "error when converting epubdoc to book: found multiple chapter matches for resource"
-        );
-    }
-    match matches.get(0) {
-        Some(navp) => Some(NavPoint {
+    // if there are are multiple matches they are most likely chapter and subchapter
+    // choose the last match, which should be the subchapter,
+    // as the chapter is just a container for the subchapters (usually)
+    if let Some(navp) = matches.last() {
+        Some(NavPoint {
             label: navp.label.to_owned(),
             content: navp.content.to_owned(),
             play_order: navp.play_order,
-        }),
-        None => None,
+        })
+    } else {
+        None
     }
 }
 
@@ -70,9 +69,8 @@ fn html_to_text(html: &str) -> String {
     let fragment = Html::parse_fragment(html);
     let mut result = String::new();
     for node in fragment.tree {
-        match node {
-            scraper::Node::Text(text) => result.push_str(text.text.as_ref()),
-            _ => {}
+        if let scraper::Node::Text(text) = node {
+            result.push_str(text.text.as_ref())
         }
     }
     result
@@ -88,6 +86,12 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
         .mdata("title")
         .expect("malformatted epub, did not contain title metadata");
     let author = edoc.mdata("creator");
+    //
+    // println!("{}", &edoc.toc.len());
+    // println!("{}", &edoc.spine.len());
+    // for navp in &edoc.toc {
+    //     println!("{}", navp.content.display());
+    // }
 
     let mut chapters: Vec<Chapter> = Vec::new();
     let mut current_resource = edoc.get_current_id();
@@ -117,14 +121,14 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
             chapters.push(Chapter {
                 title: current_chapter.label,
                 content: html_to_text(&current_chapter_content),
-                index: index,
+                index,
             });
             current_chapter = chapter_match.unwrap();
             current_chapter_content = String::new();
+            index += 1;
         }
         current_chapter_content.push_str(current_resource_content.as_str());
 
-        index += 1;
         if edoc.go_next().is_err() {
             break;
         }
@@ -133,13 +137,13 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
     chapters.push(Chapter {
         title: current_chapter.label,
         content: html_to_text(&current_chapter_content),
-        index: index,
+        index,
     });
 
     Ok(Book {
-        title: title,
-        author: author.unwrap_or("unknown".to_string()),
-        chapters: chapters,
+        title,
+        author: author.unwrap_or_else(|| "unknown".to_string()),
+        chapters,
     })
 }
 
@@ -161,6 +165,15 @@ mod tests {
             .content
             .contains("许三观是城里丝厂的送茧工，这一天他回到村里来看望他的爷爷。"));
         assert_eq!(book.chapters.get(34).unwrap().title, "第二十九章");
+    }
+
+    #[test]
+    fn parse_epub2() {
+        let book = open_as_book("test_resources/wangxiaobo-essays.epub").unwrap();
+        assert_eq!(book.author, "王小波");
+        assert_eq!(book.title, "王小波杂文集");
+        assert_eq!(book.chapters.len(), 38);
+        assert_eq!(book.chapters.get(4).unwrap().title, "花刺子模信使问题");
     }
 
     #[test]

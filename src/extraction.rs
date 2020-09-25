@@ -34,7 +34,7 @@ fn update_word_info<'a, 'b>(
     current_chapter: &'b Chapter,
     word_frequencies: &mut HashMap<&'a str, u64>,
     word_occurrences: &mut HashMap<&'a str, &'b Chapter>,
-) -> () {
+) {
     for word in words {
         let mut frequency = 1;
         if word_frequencies.contains_key(word) {
@@ -44,7 +44,6 @@ fn update_word_info<'a, 'b>(
         }
         word_frequencies.insert(word, frequency);
     }
-    ()
 }
 
 fn pkuseg_tmp_file(book_json: &str) -> PkusegBookSegmentation {
@@ -60,7 +59,7 @@ fn pkuseg_tmp_file(book_json: &str) -> PkusegBookSegmentation {
             .into_string()
             .expect("expect successful conversion from tempfile path to string")
     );
-    let func_call = format!("        segment_dump(f.read())");
+    let func_call = "        segment_dump(f.read())".to_string();
     let python_program = include_str!("pkuseg_segment_book.py");
     let full_python_program = vec![python_program, &with_open, &func_call].join("\n");
     let output = run_python(&full_python_program);
@@ -73,7 +72,7 @@ fn pkuseg_tmp_file(book_json: &str) -> PkusegBookSegmentation {
 
 fn pkuseg_stdin(book_json: &str) -> PkusegBookSegmentation {
     let data_assign = format!("    data = \"\"\"{}\"\"\"", book_json);
-    let func_call = format!("    segment_dump(data)");
+    let func_call = "    segment_dump(data)".to_string();
     let python_program = include_str!("pkuseg_segment_book.py");
     let full_python_program = vec![python_program, &data_assign, &func_call].join("\n");
     let output = run_python(&full_python_program);
@@ -83,7 +82,7 @@ fn pkuseg_stdin(book_json: &str) -> PkusegBookSegmentation {
 
 impl Extractor for Pkuseg {
     fn extract<'a>(&self, book: &'a Book) -> HashMap<String, (&'a Chapter, u64)> {
-        if book.chapters.len() < 1 {
+        if book.chapters.is_empty() {
             panic!("expected book with at least one chapter!");
         }
         let book_json = book.as_json();
@@ -128,7 +127,7 @@ impl Extractor for Pkuseg {
 
 impl Extractor for Jieba {
     fn extract<'a>(&self, book: &'a Book) -> HashMap<String, (&'a Chapter, u64)> {
-        if book.chapters.len() < 1 {
+        if book.chapters.is_empty() {
             panic!("expected book with at least one chapter!");
         }
         let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
@@ -146,7 +145,6 @@ impl Extractor for Jieba {
                 }
                 word_frequencies.insert(word, frequency);
             }
-            ()
         };
         update_word_info(self.cut(&book.title, true), book.chapters.get(0).unwrap());
         update_word_info(self.cut(&book.author, true), book.chapters.get(0).unwrap());
@@ -236,7 +234,7 @@ fn extract_from_string(s: &str) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
-    use crate::extraction::{contains_hanzi, extract_from_string, PkusegBookSegmentation};
+    use crate::extraction::{contains_hanzi, PkusegBookSegmentation};
     use crate::python_interop::run_python;
 
     #[test]
@@ -257,7 +255,7 @@ mod tests {
     fn use_pkuseg() {
         let book_json = include_str!("../test_resources/book.json");
         let data_assign = format!("    data = \"\"\"{}\"\"\"", book_json);
-        let func_call = format!("    segment_dump(data)");
+        let func_call = "    segment_dump(data)".to_string();
         let python_program = include_str!("pkuseg_segment_book.py");
         let full_python_program = vec![python_program, &data_assign, &func_call].join("\n");
         let output = run_python(&full_python_program);
