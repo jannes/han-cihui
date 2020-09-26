@@ -41,7 +41,7 @@ pub fn add_external_words(conn: &Connection, words: &HashSet<&str>) -> Result<()
 pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<(), AppError> {
     for item in vocab {
         let word = &item.word;
-        let status_int = status_to_int(&item.status);
+        let status_int = status_to_int(item.status);
         conn.execute(OVERWRITE_QUERY, params![word, status_int])?;
     }
     Ok(())
@@ -83,7 +83,7 @@ fn int_to_status(status: i64) -> Option<VocabStatus> {
     }
 }
 
-fn status_to_int(status: &VocabStatus) -> i64 {
+fn status_to_int(status: VocabStatus) -> i64 {
     match status {
         VocabStatus::Active => STATUS_ACTIVE,
         VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,

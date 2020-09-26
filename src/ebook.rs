@@ -16,9 +16,6 @@ impl Chapter {
     pub fn get_numbered_title(&self) -> String {
         format!("{:04}-{}", self.index, self.title)
     }
-    pub fn as_json(&self) -> String {
-        serde_json::to_string(self).unwrap()
-    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,6 +62,11 @@ fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &PathBuf) -> Option<NavP
     }
 }
 
+// TODO: make this work
+fn clean_html_entities(text: &str) -> String {
+    text.replace("\u{00A0}", "J")
+}
+
 fn html_to_text(html: &str) -> String {
     let fragment = Html::parse_fragment(html);
     let mut result = String::new();
@@ -77,7 +79,7 @@ fn html_to_text(html: &str) -> String {
         .lines()
         .map(|line| line.trim())
         .filter(|line| !line.is_empty())
-        .map(|line| line.to_owned() + "\n")
+        .map(|line| line.to_string() + "\n")
         .collect()
 }
 
@@ -86,13 +88,6 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
         .mdata("title")
         .expect("malformatted epub, did not contain title metadata");
     let author = edoc.mdata("creator");
-    //
-    // println!("{}", &edoc.toc.len());
-    // println!("{}", &edoc.spine.len());
-    // for navp in &edoc.toc {
-    //     println!("{}", navp.content.display());
-    // }
-
     let mut chapters: Vec<Chapter> = Vec::new();
     let mut current_resource = edoc.get_current_id();
     let mut current_chapter = NavPoint {
@@ -135,13 +130,13 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
         current_resource = edoc.get_current_id();
     }
     chapters.push(Chapter {
-        title: current_chapter.label,
+        title: clean_html_entities(&current_chapter.label),
         content: html_to_text(&current_chapter_content),
         index,
     });
 
     Ok(Book {
-        title,
+        title: clean_html_entities(&title),
         author: author.unwrap_or_else(|| "unknown".to_string()),
         chapters,
     })
