@@ -1,4 +1,4 @@
-use crate::errors::AppError;
+use anyhow::Result;
 use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::HashSet;
 
@@ -26,19 +26,19 @@ pub struct Vocab {
     pub status: VocabStatus,
 }
 
-pub fn create_table(conn: &Connection) -> Result<(), AppError> {
+pub fn create_table(conn: &Connection) -> Result<()> {
     conn.execute(SETUP_QUERY, NO_PARAMS)?;
     Ok(())
 }
 
-pub fn add_external_words(conn: &Connection, words: &HashSet<&str>) -> Result<(), AppError> {
+pub fn add_external_words(conn: &Connection, words: &HashSet<&str>) -> Result<()> {
     for word in words {
         conn.execute(INSERT_QUERY, params![word, STATUS_ADDED_EXTERNAL])?;
     }
     Ok(())
 }
 
-pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<(), AppError> {
+pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
     for item in vocab {
         let word = &item.word;
         let status_int = status_to_int(item.status);
@@ -47,7 +47,7 @@ pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<(), AppErr
     Ok(())
 }
 
-pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>, AppError> {
+pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
     let mut stmt = conn.prepare("SELECT * FROM words")?;
     // can not collect as hash set somehow?
     let vocab = stmt
@@ -61,7 +61,7 @@ pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>, AppError> {
     Ok(vocab?.into_iter().collect())
 }
 
-pub fn select_known(conn: &Connection) -> Result<Vec<String>, AppError> {
+pub fn select_known(conn: &Connection) -> Result<Vec<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status != {}",
         STATUS_SUSPENDED_UNKNOWN

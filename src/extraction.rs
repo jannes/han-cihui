@@ -135,7 +135,7 @@ impl Extractor for Jieba {
         // closure captures mutable state variables, so also needs to be mutable
         // lifetime annotation for words vector needed, as word refs are stored in captured variables,
         // which outlive the closure's scope (but not the whole function's scope)
-        let mut update_word_info = |words: Vec<&'a str>, current_chapter: &'a Chapter| -> () {
+        let mut update_word_info = |words: Vec<&'a str>, current_chapter: &'a Chapter| {
             for word in &words {
                 let mut frequency = 1;
                 if word_frequencies.contains_key(word) {

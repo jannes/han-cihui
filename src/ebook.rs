@@ -1,5 +1,4 @@
-use crate::errors::AppError;
-use crate::errors::AppError::EpubParseError;
+use anyhow::{anyhow, Context, Result};
 use epub::doc::{EpubDoc, NavPoint};
 use scraper::Html;
 use serde::{Deserialize, Serialize};
@@ -31,9 +30,10 @@ impl Book {
     }
 }
 
-pub fn open_as_book(filename: &str) -> Result<Book, AppError> {
+pub fn open_as_book(filename: &str) -> Result<Book> {
     let edoc = EpubDoc::new(filename)
-        .map_err(|_e| EpubParseError(format!("failed to create EpubDoc for {}", filename)))?;
+        .map_err(|_e| anyhow!("failed to create EpubDoc for {}", filename))?;
+
     get_book_from_edoc(edoc)
 }
 
@@ -83,10 +83,10 @@ fn html_to_text(html: &str) -> String {
         .collect()
 }
 
-fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book, AppError> {
+fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book> {
     let title = edoc
         .mdata("title")
-        .expect("malformatted epub, did not contain title metadata");
+        .context("malformatted epub, did not contain title metadata")?;
     let author = edoc.mdata("creator");
     let mut chapters: Vec<Chapter> = Vec::new();
     let mut current_resource = edoc.get_current_id();

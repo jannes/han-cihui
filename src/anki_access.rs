@@ -1,7 +1,7 @@
 extern crate rusqlite;
 extern crate serde_json;
 
-pub use crate::errors::AppError;
+use anyhow::{Context, Result};
 use rusqlite::{params, Connection, Statement, ToSql, NO_PARAMS};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -26,21 +26,21 @@ pub struct ZhNote {
 }
 
 #[allow(dead_code)]
-pub fn get_decks(conn: &Connection) -> Result<Vec<Deck>, AppError> {
+pub fn get_decks(conn: &Connection) -> Result<Vec<Deck>> {
     let mut example_query = conn.prepare("SELECT decks FROM col")?;
     let mut cols = example_query.query_map(NO_PARAMS, |row| {
         Ok(DecksWrapper {
             json_str: row.get(0)?,
         })
     })?;
-    let only_row = cols.next().expect("should have one row");
-    jsondecks_to_decks(only_row?.json_str).map_err(AppError::from)
+    let only_row = cols.next().context("should have one row")?;
+    jsondecks_to_decks(only_row?.json_str).context("rusqlite error when parsing deck json")
 }
 
 pub fn get_zh_notes(
     conn: &Connection,
     note_field_map: &HashMap<&str, &str>,
-) -> Result<HashSet<ZhNote>, AppError> {
+) -> Result<HashSet<ZhNote>> {
     let fields_info = get_zh_fields_info(conn, note_field_map)?;
     let mut all_notes: HashSet<ZhNote> = HashSet::new();
     for i in 0..fields_info.amount {
@@ -152,14 +152,14 @@ fn fieldsstr_to_field(fields: &str, index: usize) -> String {
 fn get_zh_fields_info(
     conn: &Connection,
     note_field_map: &HashMap<&str, &str>,
-) -> Result<ZhFieldsInfo, AppError> {
+) -> Result<ZhFieldsInfo> {
     let mut notes_query = conn.prepare("SELECT models FROM col")?;
     let mut rows = notes_query.query(NO_PARAMS)?;
     let notes_json_str: String = rows.next()?.unwrap().get_unwrap(0);
     let parsed_notes: Value = serde_json::from_str(notes_json_str.as_str()).unwrap();
     let notes_map = parsed_notes
         .as_object()
-        .expect("this should be a json object");
+        .context("this should be a json object")?;
 
     let mut note_ids = Vec::new();
     let mut zh_field_indexes = Vec::new();

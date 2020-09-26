@@ -14,22 +14,20 @@ use prettytable::Table;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
-use errors::AppError;
 use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::ebook::open_as_book;
-use crate::errors::AppError::InvalidCLIArgument;
 use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult, Pkuseg};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
 };
+use anyhow::{anyhow, Context, Result};
 use std::fs::File;
 
 mod anki_access;
 mod ebook;
-mod errors;
 mod extraction;
 mod persistence;
 mod python_interop;
@@ -42,7 +40,7 @@ const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
 pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
 pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
-fn main() -> Result<(), AppError> {
+fn main() -> Result<()> {
     let matches = App::new("中文 vocab")
         .version("0.1")
         .subcommand(
@@ -129,13 +127,11 @@ fn main() -> Result<(), AppError> {
             let subcommand_matches = matches.subcommand_matches("extract").unwrap();
             let filename = subcommand_matches.value_of("filename").unwrap();
             let min_occurence = subcommand_matches.value_of("min_occurrence").unwrap();
-            let min_occ: u64 = min_occurence.parse().map_err(|_e| {
-                InvalidCLIArgument("min_occurence must positive number".to_string())
-            })?;
+            let min_occ: u64 = min_occurence
+                .parse()
+                .context("min_occurence must positive number")?;
             if min_occ < 1 {
-                return Err(AppError::InvalidCLIArgument(
-                    "min_occurence must be positive number".to_string(),
-                ));
+                return Err(anyhow!("min_occurence must be positive number"));
             }
             let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
             match subcommand_matches.value_of("save as json") {
@@ -170,7 +166,7 @@ fn do_extract(
     min_occ: u64,
     known_words: HashSet<String>,
     json_outpath: Option<&str>,
-) -> Result<(), AppError> {
+) -> Result<()> {
     let book = open_as_book(filename)?;
     println!(
         "extracting vocabulary from {} by {}",
@@ -320,11 +316,11 @@ fn do_extraction_analysis(
     unknown_voc_min_occ
 }
 
-fn no_subcommand_behavior() -> Result<(), AppError> {
+fn no_subcommand_behavior() -> Result<()> {
     Ok(())
 }
 
-fn print_stats(data_conn: &Connection) -> Result<(), AppError> {
+fn print_stats(data_conn: &Connection) -> Result<()> {
     let vocabs = select_all(data_conn)?;
     let amount_total_words = &vocabs.len();
     let mut active: HashSet<String> = HashSet::new();
@@ -374,7 +370,7 @@ fn print_stats(data_conn: &Connection) -> Result<(), AppError> {
     Ok(())
 }
 
-fn print_anki_stats() -> Result<(), AppError> {
+fn print_anki_stats() -> Result<()> {
     let conn = Connection::open(ANKIDB_PATH)?;
     let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
     let zh_notes = anki_access::get_zh_notes(&conn, &note_field_map)?;
@@ -397,7 +393,7 @@ fn print_anki_stats() -> Result<(), AppError> {
     Ok(())
 }
 
-fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<(), AppError> {
+fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()> {
     let file_str = fs::read_to_string(filename)?;
     let words_to_add: HashSet<String> = file_str
         .split('\n')
@@ -419,14 +415,14 @@ fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<(), Ap
 
 /// perform first time setup: create sqlite database and words table
 /// return database connection
-fn first_time_setup() -> Result<Connection, AppError> {
+fn first_time_setup() -> Result<Connection> {
     fs::create_dir(DATA_DIR)?;
     let conn = Connection::open(DATA_PATH)?;
     create_table(&conn)?;
     Ok(conn)
 }
 
-fn sync_anki_data(data_conn: &Connection) -> Result<(), AppError> {
+fn sync_anki_data(data_conn: &Connection) -> Result<()> {
     let conn = Connection::open(ANKIDB_PATH)?;
     let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
     let zh_notes = anki_access::get_zh_notes(&conn, &note_field_map)?;
