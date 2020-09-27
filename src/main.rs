@@ -9,7 +9,6 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use clap::{App, Arg, SubCommand};
 use prettytable::Table;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
@@ -18,15 +17,18 @@ use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
 use crate::anki_access::{NoteStatus, ZhNote};
+use crate::cli_args::get_arg_matches;
 use crate::ebook::open_as_book;
 use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult, Pkuseg};
 use crate::persistence::{
-    add_external_words, insert_overwrite, select_all, select_known, Vocab, VocabStatus,
+    add_external_words, insert_overwrite, select_all, select_known, AddedExternal, Vocab,
+    VocabStatus,
 };
 use anyhow::{anyhow, Context, Result};
 use std::fs::File;
 
 mod anki_access;
+mod cli_args;
 mod ebook;
 mod extraction;
 mod persistence;
@@ -41,51 +43,7 @@ pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
 pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
 fn main() -> Result<()> {
-    let matches = App::new("中文 vocab")
-        .version("0.1")
-        .subcommand(
-            SubCommand::with_name("add")
-                .about("add vocabulary from file")
-                .arg(
-                    Arg::with_name("filename")
-                        .required(true)
-                        .help("path to file with one word per line"),
-                ),
-        )
-        .subcommand(SubCommand::with_name("sync").about("syncs data with Anki"))
-        .subcommand(
-            SubCommand::with_name("stats")
-                .about("print vocabulary statistiscs")
-                .arg(
-                    Arg::with_name("anki only")
-                        .required(false)
-                        .short("a")
-                        .long("anki")
-                        .help("print anki statistics only"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("extract")
-                .about("extract vocabulary from epub")
-                .arg(
-                    Arg::with_name("filename")
-                        .required(true)
-                        .help("path to epub file, from which to extract vocabulary"),
-                )
-                .arg(
-                    Arg::with_name("min_occurrence")
-                        .required(true)
-                        .help("the minimum amount a word should occur to be extracted"),
-                )
-                .arg(Arg::with_name("save as json")
-                    .required(false)
-                    .long("save-json")
-                    .takes_value(true)
-                    .help("save words with minimum occurrence as json array with per chapter vocab"),
-                )
-        )
-        .subcommand(SubCommand::with_name("show").about("prints all known words"))
-        .get_matches();
+    let matches = get_arg_matches();
 
     let data_conn: Connection;
     // if first time call, do data setup
@@ -100,7 +58,12 @@ fn main() -> Result<()> {
         Some("add") => {
             let matches = matches.subcommand_matches("add").unwrap();
             let filename = matches.value_of("filename").unwrap();
-            perform_add_external(&data_conn, filename)
+            perform_add_external(&data_conn, filename, AddedExternal::Known)
+        }
+        Some("add-ignore") => {
+            let matches = matches.subcommand_matches("add").unwrap();
+            let filename = matches.value_of("filename").unwrap();
+            perform_add_external(&data_conn, filename, AddedExternal::Ignored)
         }
         Some("sync") => {
             println!("syncing Anki data");
@@ -327,12 +290,16 @@ fn print_stats(data_conn: &Connection) -> Result<()> {
     let mut suspended_known: HashSet<String> = HashSet::new();
     let mut suspended_unknown: HashSet<String> = HashSet::new();
     let mut inactive: HashSet<String> = HashSet::new();
+    let mut inactive_ignored: HashSet<String> = HashSet::new();
     for vocab in vocabs {
         match vocab.status {
             VocabStatus::Active => &active.insert(vocab.word),
             VocabStatus::SuspendedKnown => &suspended_known.insert(vocab.word),
             VocabStatus::SuspendedUnknown => &suspended_unknown.insert(vocab.word),
-            VocabStatus::AddedExternal => &inactive.insert(vocab.word),
+            VocabStatus::AddedExternal(AddedExternal::Known) => &inactive.insert(vocab.word),
+            VocabStatus::AddedExternal(AddedExternal::Ignored) => {
+                &inactive_ignored.insert(vocab.word)
+            }
         };
     }
     let mut active_or_known_characters: HashSet<&str> = HashSet::new();
@@ -359,14 +326,15 @@ fn print_stats(data_conn: &Connection) -> Result<()> {
     println!("amount active: {}", &active.len());
     println!("amount suspended known: {}", &suspended_known.len());
     println!("amount suspended unknown: {}", &suspended_unknown.len());
-    println!("amount inactive: {}", &inactive.len());
+    println!("amount inactive known: {}", &inactive.len());
+    println!("amount inactive ignored: {}", &inactive_ignored.len());
     println!("==========CHARS==========");
     println!(
         "amount total: {}",
         amount_active_or_know_chars + amount_inactive_chars
     );
     println!("amount active or known: {}", amount_active_or_know_chars);
-    println!("amount inactive: {}", amount_inactive_chars);
+    println!("amount inactive known: {}", amount_inactive_chars);
     Ok(())
 }
 
@@ -393,7 +361,7 @@ fn print_anki_stats() -> Result<()> {
     Ok(())
 }
 
-fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()> {
+fn perform_add_external(data_conn: &Connection, filename: &str, kind: AddedExternal) -> Result<()> {
     let file_str = fs::read_to_string(filename)?;
     let words_to_add: HashSet<String> = file_str
         .split('\n')
@@ -410,7 +378,7 @@ fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()> {
     println!("amount saved: {}", &words_known.len());
     println!("amount to add: {}", &words_to_add.len());
     println!("amount new: {}", &words_unknown.len());
-    add_external_words(&data_conn, words_unknown)
+    add_external_words(&data_conn, words_unknown, kind)
 }
 
 /// perform first time setup: create sqlite database and words table

@@ -10,14 +10,21 @@ const OVERWRITE_QUERY: &str = "REPLACE INTO words (word, status) VALUES (?1, ?2)
 const STATUS_ACTIVE: i64 = 0;
 const STATUS_SUSPENDED_KNOWN: i64 = 1;
 const STATUS_SUSPENDED_UNKNOWN: i64 = 2;
-const STATUS_ADDED_EXTERNAL: i64 = 3;
+const STATUS_ADDED_EXTERNAL_KNOWN: i64 = 3;
+const STATUS_ADDED_EXTERNAL_IGNORED: i64 = 4;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VocabStatus {
     Active,
     SuspendedKnown,
     SuspendedUnknown,
-    AddedExternal,
+    AddedExternal(AddedExternal),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum AddedExternal {
+    Known,
+    Ignored,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -31,9 +38,22 @@ pub fn create_table(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-pub fn add_external_words(conn: &Connection, words: &HashSet<&str>) -> Result<()> {
-    for word in words {
-        conn.execute(INSERT_QUERY, params![word, STATUS_ADDED_EXTERNAL])?;
+pub fn add_external_words(
+    conn: &Connection,
+    words: &HashSet<&str>,
+    kind: AddedExternal,
+) -> Result<()> {
+    match kind {
+        AddedExternal::Known => {
+            for word in words {
+                conn.execute(INSERT_QUERY, params![word, STATUS_ADDED_EXTERNAL_KNOWN])?;
+            }
+        }
+        AddedExternal::Ignored => {
+            for word in words {
+                conn.execute(INSERT_QUERY, params![word, STATUS_ADDED_EXTERNAL_IGNORED])?;
+            }
+        }
     }
     Ok(())
 }
@@ -76,9 +96,10 @@ pub fn select_known(conn: &Connection) -> Result<Vec<String>> {
 fn int_to_status(status: i64) -> Option<VocabStatus> {
     match status {
         STATUS_ACTIVE => Some(VocabStatus::Active),
-        STATUS_ADDED_EXTERNAL => Some(VocabStatus::AddedExternal),
         STATUS_SUSPENDED_KNOWN => Some(VocabStatus::SuspendedKnown),
         STATUS_SUSPENDED_UNKNOWN => Some(VocabStatus::SuspendedUnknown),
+        STATUS_ADDED_EXTERNAL_KNOWN => Some(VocabStatus::AddedExternal(AddedExternal::Known)),
+        STATUS_ADDED_EXTERNAL_IGNORED => Some(VocabStatus::AddedExternal(AddedExternal::Ignored)),
         _ => None,
     }
 }
@@ -88,6 +109,7 @@ fn status_to_int(status: VocabStatus) -> i64 {
         VocabStatus::Active => STATUS_ACTIVE,
         VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,
         VocabStatus::SuspendedUnknown => STATUS_SUSPENDED_UNKNOWN,
-        VocabStatus::AddedExternal => STATUS_ADDED_EXTERNAL,
+        VocabStatus::AddedExternal(AddedExternal::Known) => STATUS_ADDED_EXTERNAL_KNOWN,
+        VocabStatus::AddedExternal(AddedExternal::Ignored) => STATUS_ADDED_EXTERNAL_IGNORED,
     }
 }
