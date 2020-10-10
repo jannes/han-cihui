@@ -366,6 +366,7 @@ fn perform_add_external(data_conn: &Connection, filename: &str, kind: AddedExter
     let words_to_add: HashSet<String> = file_str
         .split('\n')
         .map(|line| String::from(line.trim()))
+        .filter(|trimmed| !trimmed.is_empty())
         .collect();
     let words_known: HashSet<String> = select_all(data_conn)?
         .iter()
