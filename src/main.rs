@@ -61,7 +61,7 @@ fn main() -> Result<()> {
             perform_add_external(&data_conn, filename, AddedExternal::Known)
         }
         Some("add-ignore") => {
-            let matches = matches.subcommand_matches("add").unwrap();
+            let matches = matches.subcommand_matches("add-ignore").unwrap();
             let filename = matches.value_of("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Ignored)
         }
@@ -320,9 +320,11 @@ fn print_stats(data_conn: &Connection) -> Result<()> {
     }
     let amount_active_or_know_chars = &active_or_known_characters.len();
     let amount_inactive_chars = &inactive_characters.len();
+    let amount_total_known = active.len() + suspended_known.len() + inactive.len();
 
     println!("==========WORDS==========");
     println!("amount total: {}", amount_total_words);
+    println!("amount total known: {}", amount_total_known);
     println!("amount active: {}", &active.len());
     println!("amount suspended known: {}", &suspended_known.len());
     println!("amount suspended unknown: {}", &suspended_unknown.len());
