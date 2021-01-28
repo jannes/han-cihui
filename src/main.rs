@@ -9,30 +9,33 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::Path;
 
-use prettytable::Table;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
 use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
+use crate::analysis::do_extraction_analysis;
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::cli_args::get_arg_matches;
 use crate::ebook::open_as_book;
-use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem, ExtractionResult, Pkuseg};
+use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem};
 use crate::persistence::{
     add_external_words, insert_overwrite, select_all, select_known, AddedExternal, Vocab,
     VocabStatus,
 };
+use crate::segmentation::SegmentationMode;
 use anyhow::{anyhow, Context, Result};
 use std::fs::File;
 
+mod analysis;
 mod anki_access;
 mod cli_args;
+mod dictionary;
 mod ebook;
 mod extraction;
 mod persistence;
-mod python_interop;
+mod segmentation;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";
 const DATA_PATH: &str = "/Users/jannes/.zhvocab/data.db";
@@ -135,7 +138,7 @@ fn do_extract(
         "extracting vocabulary from {} by {}",
         &book.title, &book.author
     );
-    let extraction_res = extract_vocab(&book, &Pkuseg {});
+    let extraction_res = extract_vocab(&book, SegmentationMode::DictionaryOnly);
     let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
     if let Some(outpath) = json_outpath {
         let chapter_titles: Vec<String> = book
@@ -171,112 +174,6 @@ fn do_extract(
     }
 
     Ok(())
-}
-
-fn do_extraction_analysis(
-    extraction_res: &ExtractionResult,
-    min_occ: u64,
-    known_words: HashSet<String>,
-) -> HashSet<&ExtractionItem> {
-    let known_chars: HashSet<&str> = known_words
-        .iter()
-        .flat_map(|word| word_to_hanzi(&word))
-        .collect();
-    /* ALL WORDS */
-    let amount_unique_words = extraction_res.vocabulary_info.len();
-    let amount_unique_chars = extraction_res.char_freq_map.len();
-    let unknown_voc: HashSet<&ExtractionItem> = extraction_res
-        .vocabulary_info
-        .iter()
-        .filter(|item| !known_words.contains(&item.word))
-        .collect();
-    let unknown_char: HashMap<&str, u64> = extraction_res
-        .char_freq_map
-        .iter()
-        .map(|(k, v)| (k.as_str(), *v))
-        .filter(|(k, _v)| !known_chars.contains(k))
-        .collect();
-    let amount_unknown_words: u64 = unknown_voc.iter().map(|item| item.frequency).sum();
-    let amount_unknown_chars: u64 = unknown_char.iter().map(|(_k, v)| v).sum();
-
-    /* MIN OCCURRING WORDS */
-    let vocabulary_min_occurring: HashSet<&ExtractionItem> = extraction_res
-        .vocabulary_info
-        .iter()
-        .filter(|item| item.frequency >= min_occ)
-        .collect();
-    let total_min_occurring_words: u64 = vocabulary_min_occurring
-        .iter()
-        .map(|item| item.frequency)
-        .sum();
-
-    let char_freq_min_occur: HashMap<String, u64> =
-        ext_item_set_to_char_freq(&vocabulary_min_occurring);
-    let total_char_min_occur: u64 = char_freq_min_occur.iter().map(|(_char, freq)| freq).sum();
-
-    let unknown_voc_min_occ: HashSet<&ExtractionItem> = vocabulary_min_occurring
-        .iter()
-        .copied()
-        .filter(|item| !known_words.contains(&item.word))
-        .collect();
-    let total_unknown_min_occur_words: u64 =
-        unknown_voc_min_occ.iter().map(|item| item.frequency).sum();
-
-    let unknown_char_min_occur: HashMap<&String, u64> = char_freq_min_occur
-        .iter()
-        .filter(|(hanzi, _freq)| !known_chars.contains(hanzi.as_str()))
-        .map(|(hanzi, freq)| (hanzi, *freq))
-        .collect();
-
-    let total_unknown_char_min_occur: u64 = unknown_char_min_occur
-        .iter()
-        .map(|(_char, freq)| freq)
-        .sum();
-
-    let mut table = Table::new();
-    table.add_row(row!["", "all", format!("min {}", min_occ)]);
-    table.add_row(row![
-        "total amount words",
-        extraction_res.word_count,
-        total_min_occurring_words
-    ]);
-    table.add_row(row![
-        "total amount unknown words",
-        amount_unknown_words,
-        total_unknown_min_occur_words
-    ]);
-    table.add_row(row![
-        "total amount characters",
-        extraction_res.character_count,
-        total_char_min_occur
-    ]);
-    table.add_row(row![
-        "total amount unknown characters",
-        amount_unknown_chars,
-        total_unknown_char_min_occur
-    ]);
-    table.add_row(row![
-        "amount unique words",
-        amount_unique_words,
-        vocabulary_min_occurring.len()
-    ]);
-    table.add_row(row![
-        "amount unknown unique words",
-        unknown_voc.len(),
-        unknown_voc_min_occ.len()
-    ]);
-    table.add_row(row![
-        "amount unique characters",
-        amount_unique_chars,
-        char_freq_min_occur.len()
-    ]);
-    table.add_row(row![
-        "amount unknown unique characters",
-        unknown_char.len(),
-        unknown_char_min_occur.len()
-    ]);
-    table.printstd();
-    unknown_voc_min_occ
 }
 
 fn no_subcommand_behavior() -> Result<()> {
