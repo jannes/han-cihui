@@ -34,6 +34,22 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("analyze")
+                .about("Analyze vocabulary of epub")
+                .arg(
+                    Arg::with_name("filename")
+                        .required(true)
+                        .help("path to epub file"),
+                )
+                .arg(
+                    Arg::with_name("dict-only")
+                        .required(false)
+                        .short("d")
+                        .long("dict-only")
+                        .help("segmentation mode: dict-only"),
+                )
+        )
+        .subcommand(
             SubCommand::with_name("extract")
                 .about("Extracts vocabulary from epub")
                 .arg(
@@ -45,6 +61,13 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                     Arg::with_name("min_occurrence")
                         .required(true)
                         .help("the minimum amount a word should occur to be extracted"),
+                )
+                .arg(
+                    Arg::with_name("dict-only")
+                        .required(false)
+                        .short("d")
+                        .long("dict-only")
+                        .help("segmentation mode: dict-only"),
                 )
                 .arg(Arg::with_name("save as json")
                          .required(false)

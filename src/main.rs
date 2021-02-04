@@ -25,6 +25,7 @@ use crate::persistence::{
     VocabStatus,
 };
 use crate::segmentation::SegmentationMode;
+use crate::tui::enter_analysis_tui;
 use anyhow::{anyhow, Context, Result};
 use std::fs::File;
 
@@ -36,13 +37,15 @@ mod ebook;
 mod extraction;
 mod persistence;
 mod segmentation;
+mod tui;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";
 const DATA_PATH: &str = "/Users/jannes/.zhvocab/data.db";
 const ANKIDB_PATH: &str = "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
 const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
 const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
-pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
+pub const SUSPENDED_KNOWN_FLAG: i32 = 3;
+// green
 pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
 fn main() -> Result<()> {
@@ -89,6 +92,20 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
+        Some("analyze") => {
+            let subcommand_matches = matches.subcommand_matches("analyze").unwrap();
+            let filename = subcommand_matches.value_of("filename").unwrap();
+            let segmentation_mode = if subcommand_matches.is_present("dict-only") {
+                SegmentationMode::DictionaryOnly
+            } else {
+                SegmentationMode::Default
+            };
+            let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
+            let book = open_as_book(filename)?;
+            println!("analyzing book ...");
+            let extraction_res = extract_vocab(&book, segmentation_mode);
+            enter_analysis_tui(&extraction_res, known_words)
+        }
         Some("extract") => {
             let subcommand_matches = matches.subcommand_matches("extract").unwrap();
             let filename = subcommand_matches.value_of("filename").unwrap();
@@ -99,10 +116,21 @@ fn main() -> Result<()> {
             if min_occ < 1 {
                 return Err(anyhow!("min_occurence must be positive number"));
             }
+            let segmentation_mode = if subcommand_matches.is_present("dict-only") {
+                SegmentationMode::DictionaryOnly
+            } else {
+                SegmentationMode::Default
+            };
             let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
             match subcommand_matches.value_of("save as json") {
-                Some(outpath) => do_extract(filename, min_occ, known_words, Some(outpath)),
-                None => do_extract(filename, min_occ, known_words, None),
+                Some(outpath) => do_extract(
+                    filename,
+                    segmentation_mode,
+                    min_occ,
+                    known_words,
+                    Some(outpath),
+                ),
+                None => do_extract(filename, segmentation_mode, min_occ, known_words, None),
             }
         }
         _ => no_subcommand_behavior(),
@@ -129,6 +157,7 @@ fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<St
 
 fn do_extract(
     filename: &str,
+    segmentation_mode: SegmentationMode,
     min_occ: u64,
     known_words: HashSet<String>,
     json_outpath: Option<&str>,
@@ -138,7 +167,7 @@ fn do_extract(
         "extracting vocabulary from {} by {}",
         &book.title, &book.author
     );
-    let extraction_res = extract_vocab(&book, SegmentationMode::DictionaryOnly);
+    let extraction_res = extract_vocab(&book, segmentation_mode);
     let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
     if let Some(outpath) = json_outpath {
         let chapter_titles: Vec<String> = book
