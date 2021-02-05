@@ -32,7 +32,6 @@ use std::fs::File;
 mod analysis;
 mod anki_access;
 mod cli_args;
-mod dictionary;
 mod ebook;
 mod extraction;
 mod persistence;
@@ -104,7 +103,7 @@ fn main() -> Result<()> {
             let book = open_as_book(filename)?;
             println!("analyzing book ...");
             let extraction_res = extract_vocab(&book, segmentation_mode);
-            enter_analysis_tui(&extraction_res, known_words)
+            enter_analysis_tui(&book, &extraction_res, known_words)
         }
         Some("extract") => {
             let subcommand_matches = matches.subcommand_matches("extract").unwrap();

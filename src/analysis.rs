@@ -1,9 +1,12 @@
-use crate::dictionary::get_dictionary_words;
-use crate::ext_item_set_to_char_freq;
 use crate::extraction::{word_to_hanzi, ExtractionItem, ExtractionResult};
+use crate::{ebook::Book, ext_item_set_to_char_freq};
+use anyhow::{Context, Result};
 use prettytable::Table;
-use std::collections::{HashMap, HashSet};
-
+use serde_json::{json, to_writer_pretty, Value};
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+};
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct AnalysisInfo {
@@ -17,18 +20,12 @@ pub struct AnalysisInfo {
     pub unknown_unique_chars: u64,
 }
 
-/// Get analysis info about words/chars for raw extraction result
-///
-/// min_occurrence_words: the minimum frequency for a word to be included in analysis
-/// min_occurrence_unknown_chars:
-///     if Some(amount), also include all words that include a character
-///     that overall occurrs at least this amount and is unknown
-pub fn get_analysis_info(
-    extraction_res: &ExtractionResult,
+pub fn get_filtered_extraction_items<'a>(
+    extraction_res: &'a ExtractionResult,
     min_occurrence_words: u64,
     known_words: &HashSet<String>,
     min_occurrence_unknown_chars: Option<u64>,
-) -> AnalysisInfo {
+) -> HashSet<&'a ExtractionItem> {
     let known_chars: HashSet<String> = known_words
         .iter()
         .flat_map(|w| word_to_hanzi(w))
@@ -54,13 +51,36 @@ pub fn get_analysis_info(
             min_occurring_words
         }
     };
-
-    /* ALL MIN OCCURRING WORDS/CHARS */
-    let vocabulary_min_occurring: HashSet<&ExtractionItem> = extraction_res
+    extraction_res
         .vocabulary_info
         .iter()
         .filter(|item| occurrence_condition(item))
+        .collect()
+}
+
+/// Get analysis info about words/chars for raw extraction result
+///
+/// min_occurrence_words: the minimum frequency for a word to be included in analysis
+/// min_occurrence_unknown_chars:
+///     if Some(amount), also include all words that include a character
+///     that overall occurrs at least this amount and is unknown
+pub fn get_analysis_info(
+    extraction_res: &ExtractionResult,
+    min_occurrence_words: u64,
+    known_words: &HashSet<String>,
+    min_occurrence_unknown_chars: Option<u64>,
+) -> AnalysisInfo {
+    let known_chars: HashSet<String> = known_words
+        .iter()
+        .flat_map(|w| word_to_hanzi(w))
+        .map(|hanzi| hanzi.to_string())
         .collect();
+    let vocabulary_min_occurring = get_filtered_extraction_items(
+        extraction_res,
+        min_occurrence_words,
+        known_words,
+        min_occurrence_unknown_chars,
+    );
     let total_words: u64 = vocabulary_min_occurring
         .iter()
         .map(|item| item.frequency)
@@ -262,4 +282,49 @@ pub fn do_extraction_analysis(
     ]);
     table.printstd();
     unknown_voc_min_occ
+}
+
+pub fn save_filtered_extraction_info(
+    book: &Book,
+    filtered_extraction_set: &HashSet<&ExtractionItem>,
+    outpath: &str,
+) -> Result<()> {
+    let chapter_titles: Vec<String> = book
+        .chapters
+        .iter()
+        .map(|chapter| chapter.get_numbered_title())
+        .collect();
+    let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
+        .iter()
+        .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
+        .collect();
+    for item in filtered_extraction_set {
+        chapter_vocabulary
+            .get_mut(item.location.as_str())
+            .unwrap()
+            .insert(item);
+    }
+    let chapter_jsons: Vec<Value> = chapter_titles
+        .iter()
+        .map(|chapter_title| {
+            json!({
+            "title": chapter_title,
+            "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
+            .map(|item| item.word.as_str()).collect::<Vec<&str>>()
+            })
+        })
+        .collect();
+    let output_json = json!({
+        "title": &book.title,
+        "vocabulary": chapter_jsons
+    });
+    to_writer_pretty(&File::create(outpath)?, &output_json).context("failed to write result json")
+}
+
+pub fn get_dictionary_words() -> HashSet<String> {
+    let words_str = include_str!("../dictionary.txt");
+    words_str
+        .split('\n')
+        .map(|line| line.trim().to_string())
+        .collect()
 }

@@ -1,11 +1,9 @@
-use crate::{
-    analysis::{get_analysis_info, AnalysisInfo},
-    extraction::ExtractionResult,
-};
+use crate::{analysis::{AnalysisInfo, get_analysis_info, get_filtered_extraction_items, save_filtered_extraction_info}, ebook::Book, extraction::ExtractionResult};
 use anyhow::{Context, Result};
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use io::BufRead;
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -35,6 +33,7 @@ struct AnalysisQuery {
 }
 
 pub fn enter_analysis_tui(
+    book: &Book,
     extraction_result: &ExtractionResult,
     known_words: HashSet<String>,
 ) -> Result<()> {
@@ -75,6 +74,7 @@ pub fn enter_analysis_tui(
         min_occurrence_words: 3,
         min_occurrence_unknown_chars: None,
     };
+    let mut save_result = false;
 
     // QUERY and MEMOIZE STATE
     let mut get_query_analysis = |analysis_query: AnalysisQuery| {
@@ -109,7 +109,7 @@ pub fn enter_analysis_tui(
                     )
                     .split(size);
                 let header = get_header();
-                let footer = get_footer(&analysis_query);
+                let footer = get_footer();
                 let info_all = get_query_analysis(AnalysisQuery {
                     min_occurrence_words: 1,
                     min_occurrence_unknown_chars: None,
@@ -126,6 +126,12 @@ pub fn enter_analysis_tui(
                 KeyCode::Char('q') => {
                     disable_raw_mode()?;
                     terminal.show_cursor()?;
+                    break;
+                }
+                KeyCode::Char('s') => {
+                    disable_raw_mode()?;
+                    terminal.show_cursor()?;
+                    save_result = true;
                     break;
                 }
                 // reduce min_occurrence of words
@@ -150,7 +156,7 @@ pub fn enter_analysis_tui(
                                     Some(amount.checked_sub(1).unwrap())
                                 }
                             }
-                            None => None
+                            None => None,
                         };
                 }
                 // increase min_occurrence of unknown chars
@@ -166,7 +172,25 @@ pub fn enter_analysis_tui(
             Event::Tick => {}
         }
     }
-
+    if save_result {
+        println!("type path where result json should be saved, then press enter");
+        let stdin = io::stdin();
+        let path = stdin
+            .lock()
+            .lines()
+            .next()
+            .expect("expected one line of input")
+            .context("could not read line from stdin")?;
+        let filtered_extraction_set = get_filtered_extraction_items(
+            extraction_result,
+            analysis_query.min_occurrence_words,
+            &known_words,
+            analysis_query.min_occurrence_unknown_chars,
+        );
+        save_filtered_extraction_info(&book, &filtered_extraction_set, &path)?;
+        println!("saved result");
+    }
+    println!("exiting");
     Ok(())
 }
 
@@ -182,7 +206,9 @@ fn render_analysis_info<B: Backend>(
         .margin(2)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
     let chunks = layout.split(area);
-    let block = Block::default().borders(Borders::ALL).title("Graphs");
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("词/字 occurrence info");
     frame.render_widget(block, area);
     let all_chunk = chunks[0];
     let min_occ_chunk = chunks[1];
@@ -192,10 +218,10 @@ fn render_analysis_info<B: Backend>(
     );
     let min_occ_title = match min_occ_query.min_occurrence_unknown_chars {
         Some(amount) => format!(
-            "words occuring >= {}, or containing unknown chars occurring >= {}",
+            "#word >= {} OR contains unknown #char >= {}",
             min_occ_query.min_occurrence_words, amount
         ),
-        None => format!("words occurring >= {}", min_occ_query.min_occurrence_words),
+        None => format!("#word >= {}", min_occ_query.min_occurrence_words),
     };
     frame.render_widget(
         get_analysis_info_table(info_min_occ, min_occ_title),
@@ -251,21 +277,14 @@ fn get_header() -> Paragraph<'static> {
         )
 }
 
-fn get_footer(current_analysis_query: &AnalysisQuery) -> Paragraph {
-    let min_occ_unk_char = match current_analysis_query.min_occurrence_unknown_chars {
-        Some(i) => format!("{}", i),
-        None => "None".to_string(),
-    };
-    Paragraph::new(format!(
-        "Query --- min words: {}, min unknown chars: {}",
-        current_analysis_query.min_occurrence_words, min_occ_unk_char
-    ))
-    .style(Style::default().fg(Color::LightCyan))
-    .alignment(Alignment::Center)
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .style(Style::default().fg(Color::White))
-            .border_type(BorderType::Plain),
-    )
+fn get_footer() -> Paragraph<'static> {
+    Paragraph::new("[J]: - word occ [K]: + word occ [H]: - char occ [L]: + char occ [S]: save")
+        .style(Style::default().fg(Color::LightCyan))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::White))
+                .border_type(BorderType::Plain),
+        )
 }
