@@ -9,6 +9,12 @@ use std::{
 };
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
+pub struct AnalysisQuery {
+    pub min_occurrence_words: u64,
+    pub min_occurrence_unknown_chars: Option<u64>,
+}
+
+#[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct AnalysisInfo {
     pub total_words: u64,
     pub total_chars: u64,

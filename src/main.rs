@@ -15,7 +15,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
-use crate::analysis::do_extraction_analysis;
+use crate::analysis::{AnalysisQuery, do_extraction_analysis};
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::cli_args::get_arg_matches;
 use crate::ebook::open_as_book;
@@ -25,7 +25,8 @@ use crate::persistence::{
     VocabStatus,
 };
 use crate::segmentation::SegmentationMode;
-use crate::tui::enter_analysis_tui;
+use crate::state::{State, AnalysisState, InfoState, View, ExtractedState};
+use crate::tui::enter_tui;
 use anyhow::{anyhow, Context, Result};
 use std::fs::File;
 
@@ -36,6 +37,7 @@ mod ebook;
 mod extraction;
 mod persistence;
 mod segmentation;
+mod state;
 mod tui;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";
@@ -103,7 +105,23 @@ fn main() -> Result<()> {
             let book = open_as_book(filename)?;
             println!("analyzing book ...");
             let extraction_res = extract_vocab(&book, segmentation_mode);
-            enter_analysis_tui(&book, &extraction_res, known_words)
+            let state = State {
+                analysis_state: AnalysisState::Extracted(ExtractedState {
+                    book,
+                    extraction_result: extraction_res,
+                    analysis_query: AnalysisQuery {
+                        min_occurrence_words: 3,
+                        min_occurrence_unknown_chars: None,
+                        
+                    },
+                    analysis_infos: HashMap::new(),
+                    known_words,
+                }),
+                info_state: InfoState::Info,
+                current_view: View::Analysis,
+
+            };
+            enter_tui(state)
         }
         Some("extract") => {
             let subcommand_matches = matches.subcommand_matches("extract").unwrap();
@@ -132,7 +150,9 @@ fn main() -> Result<()> {
                 None => do_extract(filename, segmentation_mode, min_occ, known_words, None),
             }
         }
-        _ => no_subcommand_behavior(),
+        _ => {
+            enter_tui(State::default())
+        }
     }
 }
 
