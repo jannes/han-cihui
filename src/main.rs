@@ -5,17 +5,18 @@ extern crate lazy_static;
 extern crate prettytable;
 extern crate rusqlite;
 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, sync::{Arc, Mutex}};
 use std::fs;
 use std::path::Path;
 
 use rusqlite::Connection;
+use state::{ExtractQuery, ExtractingState};
 use unicode_segmentation::UnicodeSegmentation;
 
 use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
-use crate::analysis::{AnalysisQuery, do_extraction_analysis};
+use crate::analysis::do_extraction_analysis;
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::cli_args::get_arg_matches;
 use crate::ebook::open_as_book;
@@ -25,7 +26,7 @@ use crate::persistence::{
     VocabStatus,
 };
 use crate::segmentation::SegmentationMode;
-use crate::state::{State, AnalysisState, InfoState, View, ExtractedState};
+use crate::state::{AnalysisState, InfoState, State, View};
 use crate::tui::enter_tui;
 use anyhow::{anyhow, Context, Result};
 use std::fs::File;
@@ -101,25 +102,16 @@ fn main() -> Result<()> {
             } else {
                 SegmentationMode::Default
             };
-            let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
-            let book = open_as_book(filename)?;
-            println!("analyzing book ...");
-            let extraction_res = extract_vocab(&book, segmentation_mode);
+            let extract_query = ExtractQuery {
+                filename: filename.to_string(),
+                segmentation_mode,
+            };
+            let db = Arc::new(Mutex::new(data_conn));
             let state = State {
-                analysis_state: AnalysisState::Extracted(ExtractedState {
-                    book,
-                    extraction_result: extraction_res,
-                    analysis_query: AnalysisQuery {
-                        min_occurrence_words: 3,
-                        min_occurrence_unknown_chars: None,
-                        
-                    },
-                    analysis_infos: HashMap::new(),
-                    known_words,
-                }),
+                analysis_state: AnalysisState::Extracting(ExtractingState::new(extract_query, db.clone())),
                 info_state: InfoState::Info,
                 current_view: View::Analysis,
-
+                db_connection: db,
             };
             enter_tui(state)
         }
@@ -150,9 +142,7 @@ fn main() -> Result<()> {
                 None => do_extract(filename, segmentation_mode, min_occ, known_words, None),
             }
         }
-        _ => {
-            enter_tui(State::default())
-        }
+        _ => enter_tui(State::new(data_conn)),
     }
 }
 

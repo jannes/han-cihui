@@ -1,27 +1,25 @@
-use crate::{
-    analysis::{
-        AnalysisInfo,
-    },
-    state::{AnalysisState, ExtractedState, State, View},
-};
+use crate::{analysis::AnalysisInfo, state::{AnalysisState, ExtractedState, ExtractingState, State, View}};
 use anyhow::{Context, Result};
 use crossterm::event;
 use crossterm::event::KeyCode;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use event::KeyEvent;
-use std::{time::{Duration, Instant}, unimplemented};
 use std::{io, thread};
 use std::{io::Write, sync::mpsc};
-use tui::{
-    style::{Color, Style},
-    Frame,
+use std::{
+    time::{Duration, Instant},
+    unimplemented,
 };
-use tui::{backend::CrosstermBackend, layout::Rect};
+use tui::{backend::CrosstermBackend, layout::Rect, widgets::{Clear, Wrap}};
 use tui::{
     layout::{Alignment, Constraint, Direction, Layout},
     widgets::{Row, Table},
 };
 use tui::{style::Modifier, text::Spans, Terminal};
+use tui::{
+    style::{Color, Style},
+    Frame,
+};
 use tui::{
     text::Span,
     widgets::{Block, BorderType, Borders, Paragraph, Tabs},
@@ -35,7 +33,7 @@ enum Event<I> {
 pub fn enter_tui(mut state: State) -> Result<()> {
     enable_raw_mode().expect("can run in raw mode");
     let (tx, rx) = mpsc::channel();
-    let tick_rate = Duration::from_millis(20);
+    let tick_rate = Duration::from_millis(200);
     // listen to key events on background thread, which sends them through channel
     thread::spawn(move || {
         let mut last_tick = Instant::now();
@@ -118,27 +116,35 @@ fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<State> {
             _ => key_event,
         },
         Event::Tick => {
+            if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
+                if let Some(new_state) =  extracting_state.update() {
+                    state.analysis_state = new_state;
+                }
+            }
             return Ok(state);
         }
     };
     match state.current_view {
         View::Analysis => match &mut state.analysis_state {
-            AnalysisState::Blank => {}
-            AnalysisState::Extract(_) => {}
-            AnalysisState::Extracting => {}
             AnalysisState::Extracted(extracted_state) => {
                 handle_event_analysis_extracted(extracted_state, key_event)?;
             }
+            AnalysisState::Blank => {}
+            AnalysisState::ExtractError => {}
+            AnalysisState::Extracting(_) => {}
         },
         View::Info => {
             handle_event_info(&mut state, key_event)?;
-        },
-        View::Exit => {},
+        }
+        View::Exit => {}
     };
     Ok(state)
 }
 
-fn handle_event_analysis_extracted(extracted_state: &mut ExtractedState, key_event: KeyEvent) -> Result<()> {
+fn handle_event_analysis_extracted(
+    extracted_state: &mut ExtractedState,
+    key_event: KeyEvent,
+) -> Result<()> {
     let mut analysis_query = extracted_state.analysis_query;
     match key_event.code {
         KeyCode::Char('s') => {}
@@ -189,10 +195,12 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
     match state.current_view {
         View::Analysis => match &state.analysis_state {
             AnalysisState::Blank => {}
-            AnalysisState::Extract(_) => {}
-            AnalysisState::Extracting => {}
             AnalysisState::Extracted(extracted_state) => {
                 draw_analysis_extracted(frame, extracted_state, area);
+            }
+            AnalysisState::ExtractError => {}
+            AnalysisState::Extracting(extracting_state) => {
+                draw_analysis_extracting(frame, extracting_state, area);
             }
         },
         View::Info => draw_info(frame, state, area),
@@ -242,6 +250,21 @@ fn draw_analysis_extracted(
     );
 }
 
+fn draw_analysis_extracting(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    state: &ExtractingState,
+    area: Rect,
+) {
+    let amount_dots = (state.elapsed().as_secs() % 10) as usize;
+    let text = format!("Extracting {}", ".".repeat(amount_dots));
+    let area = get_centered_rect(area);
+    let paragraph = Paragraph::new(text)
+                .block(Block::default().title("Extracting from epub").borders(Borders::ALL))
+                .alignment(Alignment::Left).wrap(Wrap { trim: true });
+    frame.render_widget(Clear, area); //this clears out the background
+    frame.render_widget(paragraph, area);
+}
+
 fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
     let row1 = Row::new(vec![
         "total words".to_string(),
@@ -277,6 +300,33 @@ fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
         ])
 }
 
+fn get_centered_rect(r: Rect) -> Rect {
+    let percent_y = 50;
+    let percent_x = 50;
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_y) / 2),
+                Constraint::Percentage(percent_y),
+                Constraint::Percentage((100 - percent_y) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(r);
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Percentage((100 - percent_x) / 2),
+                Constraint::Percentage(percent_x),
+                Constraint::Percentage((100 - percent_x) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
+}
+
 fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let tab_titles = vec!["Info [0]".to_string(), "Analysis [1]".to_string()]
         .into_iter()
@@ -307,16 +357,15 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
         View::Info => "[Q]: exit",
         View::Exit => "EXITING",
     };
-    let paragraph =
-        Paragraph::new(text)
-            .style(Style::default().fg(Color::LightCyan))
-            .alignment(Alignment::Center)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .style(Style::default().fg(Color::White))
-                    .border_type(BorderType::Plain),
-            );
+    let paragraph = Paragraph::new(text)
+        .style(Style::default().fg(Color::LightCyan))
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Style::default().fg(Color::White))
+                .border_type(BorderType::Plain),
+        );
     frame.render_widget(paragraph, area);
 }
 

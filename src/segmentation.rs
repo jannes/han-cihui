@@ -18,6 +18,7 @@ pub struct BookSegmentation {
     pub chapter_cuts: Vec<ChapterSegmentation>,
 }
 
+#[derive(Clone, Copy)]
 pub enum SegmentationMode {
     Default,
     DictionaryOnly,
