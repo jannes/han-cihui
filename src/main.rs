@@ -5,15 +5,17 @@ extern crate lazy_static;
 extern crate prettytable;
 extern crate rusqlite;
 
-use std::{collections::{HashMap, HashSet}, sync::{Arc, Mutex}};
 use std::fs;
 use std::path::Path;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
 use unicode_segmentation::UnicodeSegmentation;
 
-use persistence::create_table;
 use serde_json::{json, to_writer_pretty, Value};
 
 use crate::analysis::do_extraction_analysis;
@@ -22,7 +24,7 @@ use crate::cli_args::get_arg_matches;
 use crate::ebook::open_as_book;
 use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem};
 use crate::persistence::{
-    add_external_words, insert_overwrite, select_all, select_known, AddedExternal, Vocab,
+    add_external_words, create_table, select_all, select_known, sync_anki_data, AddedExternal,
     VocabStatus,
 };
 use crate::segmentation::SegmentationMode;
@@ -40,6 +42,7 @@ mod persistence;
 mod segmentation;
 mod state;
 mod tui;
+mod vocabulary;
 
 const DATA_DIR: &str = "/Users/jannes/.zhvocab";
 const DATA_PATH: &str = "/Users/jannes/.zhvocab/data.db";
@@ -108,8 +111,11 @@ fn main() -> Result<()> {
             };
             let db = Arc::new(Mutex::new(data_conn));
             let state = State {
-                analysis_state: AnalysisState::Extracting(ExtractingState::new(extract_query, db.clone())),
-                info_state: InfoState::Info,
+                analysis_state: AnalysisState::Extracting(ExtractingState::new(
+                    extract_query,
+                    db.clone(),
+                )),
+                info_state: InfoState::init(db.clone())?,
                 current_view: View::Analysis,
                 db_connection: db,
             };
@@ -142,7 +148,7 @@ fn main() -> Result<()> {
                 None => do_extract(filename, segmentation_mode, min_occ, known_words, None),
             }
         }
-        _ => enter_tui(State::new(data_conn)),
+        _ => enter_tui(State::new(data_conn)?),
     }
 }
 
@@ -211,10 +217,6 @@ fn do_extract(
         to_writer_pretty(&File::create(outpath)?, &output_json)?;
     }
 
-    Ok(())
-}
-
-fn no_subcommand_behavior() -> Result<()> {
     Ok(())
 }
 
@@ -326,25 +328,6 @@ fn first_time_setup() -> Result<Connection> {
     let conn = Connection::open(DATA_PATH)?;
     create_table(&conn)?;
     Ok(conn)
-}
-
-fn sync_anki_data(data_conn: &Connection) -> Result<()> {
-    let conn = Connection::open(ANKIDB_PATH)?;
-    let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
-    let zh_notes = anki_access::get_zh_notes(&conn, &note_field_map)?;
-    let anki_vocab: Vec<Vocab> = zh_notes
-        .iter()
-        .flat_map(|note| {
-            let status = match note.status {
-                NoteStatus::Active => VocabStatus::Active,
-                NoteStatus::SuspendedKnown => VocabStatus::SuspendedKnown,
-                NoteStatus::SuspendedUnknown => VocabStatus::SuspendedUnknown,
-            };
-            let words = zh_field_to_words(&note.zh_field);
-            words.into_iter().map(move |word| Vocab { word, status })
-        })
-        .collect();
-    insert_overwrite(data_conn, &anki_vocab)
 }
 
 fn notes_to_words_filtered(notes: &HashSet<ZhNote>, status: NoteStatus) -> HashSet<String> {

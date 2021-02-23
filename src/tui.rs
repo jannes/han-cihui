@@ -1,4 +1,8 @@
-use crate::{analysis::AnalysisInfo, state::{AnalysisState, ExtractedState, ExtractingState, State, View}};
+use crate::{
+    analysis::AnalysisInfo,
+    state::{AnalysisState, ExtractedState, ExtractingState, InfoState, State, View},
+    vocabulary::VocabularyInfo,
+};
 use anyhow::{Context, Result};
 use crossterm::event;
 use crossterm::event::KeyCode;
@@ -10,7 +14,11 @@ use std::{
     time::{Duration, Instant},
     unimplemented,
 };
-use tui::{backend::CrosstermBackend, layout::Rect, widgets::{Clear, Wrap}};
+use tui::{
+    backend::CrosstermBackend,
+    layout::Rect,
+    widgets::{Clear, Wrap},
+};
 use tui::{
     layout::{Alignment, Constraint, Direction, Layout},
     widgets::{Row, Table},
@@ -117,7 +125,7 @@ fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<State> {
         },
         Event::Tick => {
             if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
-                if let Some(new_state) =  extracting_state.update() {
+                if let Some(new_state) = extracting_state.update() {
                     state.analysis_state = new_state;
                 }
             }
@@ -203,16 +211,52 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
                 draw_analysis_extracting(frame, extracting_state, area);
             }
         },
-        View::Info => draw_info(frame, state, area),
+        View::Info => match &state.info_state {
+            InfoState::Info(vocab_info) => draw_info(frame, vocab_info, area),
+            InfoState::Syncing => draw_info_syncing(frame, state, area),
+        },
         View::Exit => {}
     }
 }
 
-fn draw_info(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+fn draw_info(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    vocab_info: &VocabularyInfo,
+    area: Rect,
+) {
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(2)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
+    let chunks = layout.split(area);
     let block = Block::default()
         .borders(Borders::ALL)
-        .title("My vocabulary (TODO)");
+        .title("My vocabulary");
+    let words_text = vocab_info
+        .words_description()
+        .into_iter()
+        .map(Spans::from)
+        .collect::<Vec<Spans>>();
+    let chars_text = vocab_info
+        .chars_description()
+        .into_iter()
+        .map(Spans::from)
+        .collect::<Vec<Spans>>();
+    let words_paragraph = Paragraph::new(words_text)
+        .block(Block::default().title("词").borders(Borders::ALL))
+        .alignment(Alignment::Right)
+        .wrap(Wrap { trim: true });
+    let chars_paragraph = Paragraph::new(chars_text)
+        .block(Block::default().title("字").borders(Borders::ALL))
+        .alignment(Alignment::Right)
+        .wrap(Wrap { trim: true });
     frame.render_widget(block, area);
+    frame.render_widget(words_paragraph, chunks[0]);
+    frame.render_widget(chars_paragraph, chunks[1]);
+}
+
+fn draw_info_syncing(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+    unimplemented!()
 }
 
 fn draw_analysis_extracted(
@@ -259,8 +303,13 @@ fn draw_analysis_extracting(
     let text = format!("Extracting {}", ".".repeat(amount_dots));
     let area = get_centered_rect(area);
     let paragraph = Paragraph::new(text)
-                .block(Block::default().title("Extracting from epub").borders(Borders::ALL))
-                .alignment(Alignment::Left).wrap(Wrap { trim: true });
+        .block(
+            Block::default()
+                .title("Extracting from epub")
+                .borders(Borders::ALL),
+        )
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: true });
     frame.render_widget(Clear, area); //this clears out the background
     frame.render_widget(paragraph, area);
 }

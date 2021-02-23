@@ -17,6 +17,7 @@ use crate::{
     extraction::{extract_vocab, ExtractionResult},
     persistence::select_known,
     segmentation::SegmentationMode,
+    vocabulary::{get_vocab_stats, VocabularyInfo},
 };
 
 pub struct State {
@@ -27,17 +28,14 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(db_connection: Connection) -> Self {
-        State {
+    pub fn new(db_connection: Connection) -> Result<Self> {
+        let db_connection = Arc::new(Mutex::new(db_connection));
+        Ok(State {
             analysis_state: AnalysisState::default(),
-            info_state: InfoState::default(),
+            info_state: InfoState::init(db_connection.clone())?,
             current_view: View::Info,
-            db_connection: Arc::new(Mutex::new(db_connection)),
-        }
-    }
-
-    fn get_tab_titles() -> Vec<String> {
-        vec!["Info".to_string(), "Analysis".to_string()]
+            db_connection,
+        })
     }
 }
 
@@ -61,13 +59,14 @@ impl Default for AnalysisState {
 }
 
 pub enum InfoState {
-    Info,
+    Info(VocabularyInfo),
     Syncing,
 }
 
-impl Default for InfoState {
-    fn default() -> Self {
-        InfoState::Info
+impl InfoState {
+    // getting vocab info is very fast, ok to block main thread
+    pub fn init(db_connection: Arc<Mutex<Connection>>) -> Result<Self> {
+        get_vocab_stats(db_connection).map(|v_info| InfoState::Info(v_info))
     }
 }
 
