@@ -1,4 +1,4 @@
-use crate::extraction::{word_to_hanzi, ExtractionItem, ExtractionResult};
+use crate::{extraction::{word_to_hanzi, ExtractionItem, ExtractionResult}, vocabulary::get_known_chars};
 use crate::{ebook::Book, ext_item_set_to_char_freq};
 use anyhow::{Context, Result};
 use prettytable::Table;
@@ -32,27 +32,23 @@ pub fn get_filtered_extraction_items<'a>(
     known_words: &HashSet<String>,
     min_occurrence_unknown_chars: Option<u64>,
 ) -> HashSet<&'a ExtractionItem> {
-    let known_chars: HashSet<String> = known_words
-        .iter()
-        .flat_map(|w| word_to_hanzi(w))
-        .map(|hanzi| hanzi.to_string())
-        .collect();
+    let known_chars = get_known_chars(known_words);
     let all_char_frequencies =
         ext_item_set_to_char_freq(&extraction_res.vocabulary_info.iter().collect());
     let unknown_char_frequencies: HashMap<&str, u64> = all_char_frequencies
         .iter()
-        .filter(|(c, _freq)| known_chars.contains(*c))
+        .filter(|(c, _freq)| !known_chars.contains(*c))
         .map(|(c, freq)| (c.as_str(), *freq))
         .collect();
+    // closure that determines if a single item fulfills occurrence condition
     let occurrence_condition = |extraction_item: &ExtractionItem| {
         let min_occurring_words = extraction_item.frequency >= min_occurrence_words;
         if !min_occurring_words && min_occurrence_unknown_chars.is_some() {
             // if one character in word is both unknown and occurs at least min_occurrence_unknown_chars in total
             word_to_hanzi(&extraction_item.word)
                 .iter()
-                .map(|hanzi| unknown_char_frequencies.get(hanzi))
-                .filter(|freq| freq.is_some())
-                .any(|freq| *freq.unwrap() >= min_occurrence_unknown_chars.unwrap())
+                .filter_map(|hanzi| unknown_char_frequencies.get(hanzi))
+                .any(|freq| *freq >= min_occurrence_unknown_chars.unwrap())
         } else {
             min_occurring_words
         }
@@ -76,11 +72,7 @@ pub fn get_analysis_info(
     known_words: &HashSet<String>,
     min_occurrence_unknown_chars: Option<u64>,
 ) -> AnalysisInfo {
-    let known_chars: HashSet<String> = known_words
-        .iter()
-        .flat_map(|w| word_to_hanzi(w))
-        .map(|hanzi| hanzi.to_string())
-        .collect();
+    let known_chars = get_known_chars(known_words);
     let vocabulary_min_occurring = get_filtered_extraction_items(
         extraction_res,
         min_occurrence_words,

@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use crate::persistence::{select_all, AddedExternal, VocabStatus};
+use crate::{extraction::word_to_hanzi, persistence::{select_all, AddedExternal, VocabStatus}};
 use anyhow::Result;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
@@ -36,10 +36,21 @@ impl VocabularyInfo {
     pub fn chars_description(&self) -> Vec<String> {
         vec![
             format!("chars total known: {}", self.chars_total_known),
-            format!("chars active / suspended known: {}", self.chars_active_or_suspended_known),
+            format!(
+                "chars active / suspended known: {}",
+                self.chars_active_or_suspended_known
+            ),
             format!("chars inactive known: {}", self.chars_inactive_known),
         ]
     }
+}
+
+pub fn get_known_chars(known_words: &HashSet<String>) -> HashSet<String> {
+    known_words
+        .iter()
+        .flat_map(|w| word_to_hanzi(w))
+        .map(|hanzi| hanzi.to_string())
+        .collect()
 }
 
 pub fn get_vocab_stats(data_conn: Arc<Mutex<Connection>>) -> Result<VocabularyInfo> {
