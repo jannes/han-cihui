@@ -37,6 +37,17 @@ impl State {
             db_connection,
         })
     }
+
+    /// Is the user currently entering something in an input box?
+    pub fn currently_input(&self) -> bool {
+        match self.current_view {
+            View::Analysis => match self.analysis_state {
+                AnalysisState::ExtractedSaving(_) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 pub enum View {
@@ -50,6 +61,7 @@ pub enum AnalysisState {
     ExtractError,
     Extracting(ExtractingState),
     Extracted(ExtractedState),
+    ExtractedSaving(ExtractedSavingState),
 }
 
 impl Default for AnalysisState {
@@ -138,6 +150,11 @@ pub struct ExtractedState {
     pub known_words: HashSet<String>,
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
+}
+
+pub struct ExtractedSavingState {
+    pub extracted_state: ExtractedState,
+    pub partial_save_path: String,
 }
 
 impl ExtractedState {

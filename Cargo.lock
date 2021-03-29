@@ -485,6 +485,7 @@ dependencies = [
  "tempfile",
  "tui",
  "unicode-segmentation",
+ "unicode-width",
 ]
 
 [[package]]
