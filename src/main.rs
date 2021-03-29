@@ -1,8 +1,6 @@
 extern crate clap;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate prettytable;
 extern crate rusqlite;
 
 use std::fs;
@@ -16,13 +14,9 @@ use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
 use unicode_segmentation::UnicodeSegmentation;
 
-use serde_json::{json, to_writer_pretty, Value};
-
-use crate::analysis::do_extraction_analysis;
 use crate::anki_access::{NoteStatus, ZhNote};
 use crate::cli_args::get_arg_matches;
-use crate::ebook::open_as_book;
-use crate::extraction::{extract_vocab, word_to_hanzi, ExtractionItem};
+use crate::extraction::{word_to_hanzi, ExtractionItem};
 use crate::persistence::{
     add_external_words, create_table, select_all, select_known, sync_anki_data, AddedExternal,
     VocabStatus,
@@ -30,8 +24,7 @@ use crate::persistence::{
 use crate::segmentation::SegmentationMode;
 use crate::state::{AnalysisState, InfoState, State, View};
 use crate::tui::enter_tui;
-use anyhow::{anyhow, Context, Result};
-use std::fs::File;
+use anyhow::Result;
 
 mod analysis;
 mod anki_access;
@@ -121,33 +114,6 @@ fn main() -> Result<()> {
             };
             enter_tui(state)
         }
-        Some("extract") => {
-            let subcommand_matches = matches.subcommand_matches("extract").unwrap();
-            let filename = subcommand_matches.value_of("filename").unwrap();
-            let min_occurence = subcommand_matches.value_of("min_occurrence").unwrap();
-            let min_occ: u64 = min_occurence
-                .parse()
-                .context("min_occurence must positive number")?;
-            if min_occ < 1 {
-                return Err(anyhow!("min_occurence must be positive number"));
-            }
-            let segmentation_mode = if subcommand_matches.is_present("dict-only") {
-                SegmentationMode::DictionaryOnly
-            } else {
-                SegmentationMode::Default
-            };
-            let known_words: HashSet<String> = select_known(&data_conn)?.into_iter().collect();
-            match subcommand_matches.value_of("save as json") {
-                Some(outpath) => do_extract(
-                    filename,
-                    segmentation_mode,
-                    min_occ,
-                    known_words,
-                    Some(outpath),
-                ),
-                None => do_extract(filename, segmentation_mode, min_occ, known_words, None),
-            }
-        }
         _ => enter_tui(State::new(data_conn)?),
     }
 }
@@ -168,56 +134,6 @@ fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<St
             }
         });
     char_freq_map
-}
-
-fn do_extract(
-    filename: &str,
-    segmentation_mode: SegmentationMode,
-    min_occ: u64,
-    known_words: HashSet<String>,
-    json_outpath: Option<&str>,
-) -> Result<()> {
-    let book = open_as_book(filename)?;
-    println!(
-        "extracting vocabulary from {} by {}",
-        &book.title, &book.author
-    );
-    let extraction_res = extract_vocab(&book, segmentation_mode);
-    let filtered_extraction_set = do_extraction_analysis(&extraction_res, min_occ, known_words);
-    if let Some(outpath) = json_outpath {
-        let chapter_titles: Vec<String> = book
-            .chapters
-            .iter()
-            .map(|chapter| chapter.get_numbered_title())
-            .collect();
-        let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
-            .iter()
-            .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
-            .collect();
-        for item in filtered_extraction_set {
-            chapter_vocabulary
-                .get_mut(item.location.as_str())
-                .unwrap()
-                .insert(item);
-        }
-        let chapter_jsons: Vec<Value> = chapter_titles
-            .iter()
-            .map(|chapter_title| {
-                json!({
-                "title": chapter_title,
-                "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
-                .map(|item| item.word.as_str()).collect::<Vec<&str>>()
-                })
-            })
-            .collect();
-        let output_json = json!({
-            "title": &book.title,
-            "vocabulary": chapter_jsons
-        });
-        to_writer_pretty(&File::create(outpath)?, &output_json)?;
-    }
-
-    Ok(())
 }
 
 fn print_stats(data_conn: &Connection) -> Result<()> {

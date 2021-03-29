@@ -49,33 +49,6 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .help("segmentation mode: dict-only"),
                 )
         )
-        .subcommand(
-            SubCommand::with_name("extract")
-                .about("Extracts vocabulary from epub")
-                .arg(
-                    Arg::with_name("filename")
-                        .required(true)
-                        .help("path to epub file, from which to extract vocabulary"),
-                )
-                .arg(
-                    Arg::with_name("min_occurrence")
-                        .required(true)
-                        .help("the minimum amount a word should occur to be extracted"),
-                )
-                .arg(
-                    Arg::with_name("dict-only")
-                        .required(false)
-                        .short("d")
-                        .long("dict-only")
-                        .help("segmentation mode: dict-only"),
-                )
-                .arg(Arg::with_name("save as json")
-                         .required(false)
-                         .long("save-json")
-                         .takes_value(true)
-                         .help("save words with minimum occurrence as json array with per chapter vocab"),
-                )
-        )
         .subcommand(SubCommand::with_name("show").about("Prints all known words"))
         .get_matches()
 }
