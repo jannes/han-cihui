@@ -284,7 +284,7 @@ pub fn do_extraction_analysis(
 
 pub fn save_filtered_extraction_info(
     book: &Book,
-    filtered_extraction_set: &HashSet<&ExtractionItem>,
+    unknown_words_to_save: &HashSet<&ExtractionItem>,
     outpath: &str,
 ) -> Result<()> {
     let chapter_titles: Vec<String> = book
@@ -296,7 +296,7 @@ pub fn save_filtered_extraction_info(
         .iter()
         .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
         .collect();
-    for item in filtered_extraction_set {
+    for item in unknown_words_to_save {
         chapter_vocabulary
             .get_mut(item.location.as_str())
             .unwrap()

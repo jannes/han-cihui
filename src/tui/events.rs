@@ -1,12 +1,13 @@
 use crate::{
     analysis::{get_filtered_extraction_items, save_filtered_extraction_info},
+    extraction::ExtractionItem,
     state::{AnalysisState, ExtractedSavingState, ExtractedState, State, View},
 };
 use anyhow::Result;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use event::KeyEvent;
-use std::unimplemented;
+use std::{collections::HashSet, unimplemented};
 
 pub enum Event<I> {
     Input(I),
@@ -139,7 +140,12 @@ fn handle_event_analysis_saving(
                 &extracted.known_words,
                 extracted.analysis_query.min_occurrence_unknown_chars,
             );
-            save_filtered_extraction_info(book, &filtered_extraction_set, &saving_state.partial_save_path)?;
+            let known_words = &saving_state.extracted_state.known_words;
+            let unknown_to_save: HashSet<&ExtractionItem> = filtered_extraction_set
+                .into_iter()
+                .filter(|item| !known_words.contains(&item.word))
+                .collect();
+            save_filtered_extraction_info(book, &unknown_to_save, &saving_state.partial_save_path)?;
         }
         _ => {}
     }
