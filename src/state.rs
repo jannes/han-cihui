@@ -41,10 +41,7 @@ impl State {
     /// Is the user currently entering something in an input box?
     pub fn currently_input(&self) -> bool {
         match self.current_view {
-            View::Analysis => match self.analysis_state {
-                AnalysisState::ExtractedSaving(_) => true,
-                _ => false,
-            },
+            View::Analysis => matches!(self.analysis_state, AnalysisState::ExtractedSaving(_)),
             _ => false,
         }
     }
@@ -78,7 +75,7 @@ pub enum InfoState {
 impl InfoState {
     // getting vocab info is very fast, ok to block main thread
     pub fn init(db_connection: Arc<Mutex<Connection>>) -> Result<Self> {
-        get_vocab_stats(db_connection).map(|v_info| InfoState::Info(v_info))
+        get_vocab_stats(db_connection).map(InfoState::Info)
     }
 }
 
@@ -130,7 +127,7 @@ impl ExtractingState {
         match self.receiver.try_recv() {
             Ok(res) => match res {
                 Ok(extracted_state) => Some(AnalysisState::Extracted(extracted_state)),
-                Err(e) => Some(AnalysisState::ExtractError),
+                Err(_e) => Some(AnalysisState::ExtractError),
             },
             Err(e) => match e {
                 mpsc::TryRecvError::Empty => None,

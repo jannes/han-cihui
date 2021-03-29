@@ -112,13 +112,12 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book> {
         let chapter_match = get_matching_navpoint(&edoc, &current_resource_path);
         // if any chapter matches current resource update current chapter,
         // else current resource is still in old chapter
-        if chapter_match.is_some() {
+        if let Some(current_chapter) = chapter_match {
             chapters.push(Chapter {
                 title: current_chapter.label,
                 content: html_to_text(&current_chapter_content),
                 index,
             });
-            current_chapter = chapter_match.unwrap();
             current_chapter_content = String::new();
             index += 1;
         }
