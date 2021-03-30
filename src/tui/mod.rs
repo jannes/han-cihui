@@ -1,65 +1,102 @@
 mod draw;
 mod events;
 
-use crate::{analysis::AnalysisInfo, state::{State, View}};
+use crate::{
+    analysis::AnalysisInfo,
+    state::{State, View},
+};
 use anyhow::Result;
-use crossterm::event;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
-use std::sync::mpsc;
+use crossterm::ExecutableCommand;
+use crossterm::{event, terminal};
 use std::time::{Duration, Instant};
 use std::{io, thread};
+use std::{io::Stdout, sync::mpsc};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
-use tui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, widgets::{Block, Borders, Row, Table}};
+use tui::{
+    layout::{Constraint, Direction, Layout, Rect},
+    style::{Color, Style},
+    widgets::{Block, Borders, Row, Table},
+};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
-use self::{draw::draw_tab, events::{Event, handle_event}};
+use self::{
+    draw::draw_tab,
+    events::{handle_event, Event},
+};
 
-pub fn enter_tui(mut state: State) -> Result<()> {
-    enable_raw_mode().expect("can run in raw mode");
-    let (tx, rx) = mpsc::channel();
-    let tick_rate = Duration::from_millis(200);
-    // listen to key events on background thread, which sends them through channel
-    thread::spawn(move || {
-        let mut last_tick = Instant::now();
-        loop {
-            let timeout = tick_rate
-                .checked_sub(last_tick.elapsed())
-                .unwrap_or_else(|| Duration::from_secs(0));
-
-            if event::poll(timeout).expect("event poll does not work") {
-                if let event::Event::Key(key) =
-                    event::read().expect("could not read crossterm event")
-                {
-                    tx.send(Event::Input(key)).expect("could not send event");
-                }
-            }
-
-            if last_tick.elapsed() >= tick_rate && tx.send(Event::Tick).is_ok() {
-                last_tick = Instant::now();
-            }
-        }
-    });
-    let stdout = io::stdout();
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-    terminal.clear()?;
-    // 1. draw ui 2. listen for events
-    // stop when state changes to exiting
-    loop {
-        draw_tab(&state, &mut terminal)?;
-        let event = rx.recv()?;
-        state = handle_event(state, event)?;
-        if let View::Exit = state.current_view {
-            break;
-        }
-    }
-    disable_raw_mode()?;
-    terminal.show_cursor()?;
-    Ok(())
+pub struct TuiApp {
+    terminal: Terminal<CrosstermBackend<Stdout>>,
+    // enables taking out state, passing to handle_event, and putting result back
+    // should always be Some(_), except right before & after handle_event call
+    // TODO: find more elegant, type-safe way to handle this
+    state: Option<State>,
 }
 
-// UTIL FUNCTIONS
+impl TuiApp {
+    pub fn new_stdout(state: State) -> Result<Self> {
+        let stdout = io::stdout();
+        let backend = CrosstermBackend::new(stdout);
+        let terminal = Terminal::new(backend)?;
+        let state = Some(state);
+        Ok(Self { terminal, state })
+    }
+
+    pub fn run(mut self) -> Result<()> {
+        enable_raw_mode().expect("can run in raw mode");
+        let (tx, rx) = mpsc::channel();
+        let tick_rate = Duration::from_millis(200);
+        // listen to key events on background thread, which sends them through channel
+        thread::spawn(move || {
+            let mut last_tick = Instant::now();
+            loop {
+                let timeout = tick_rate
+                    .checked_sub(last_tick.elapsed())
+                    .unwrap_or_else(|| Duration::from_secs(0));
+
+                if event::poll(timeout).expect("event poll does not work") {
+                    if let event::Event::Key(key) =
+                        event::read().expect("could not read crossterm event")
+                    {
+                        tx.send(Event::Input(key)).expect("could not send event");
+                    }
+                }
+
+                if last_tick.elapsed() >= tick_rate && tx.send(Event::Tick).is_ok() {
+                    last_tick = Instant::now();
+                }
+            }
+        });
+        self.terminal.clear()?;
+        // 1. draw ui 2. listen for events
+        // stop when state changes to exiting
+        loop {
+            draw_tab(self.state.as_ref().unwrap(), &mut self.terminal)?;
+            let event = rx.recv()?;
+            self.state = Some(handle_event(self.state.take().unwrap(), event)?);
+            if let View::Exit = self.state.as_ref().unwrap().current_view {
+                break;
+            }
+        }
+        disable_raw_mode()?;
+        self.terminal.show_cursor()?;
+        Ok(())
+    }
+}
+
+impl Drop for TuiApp {
+    fn drop(&mut self) {
+        self.terminal
+            .backend_mut()
+            .execute(terminal::LeaveAlternateScreen)
+            .expect("Could not execute to stdout");
+        terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
+    }
+}
+
+
+// ------- UTIL FUNCTIONS ---------
 
 fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
     let row1 = Row::new(vec![

@@ -12,6 +12,7 @@ use std::{
 
 use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
+use crate::tui::TuiApp;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::anki_access::{NoteStatus, ZhNote};
@@ -23,7 +24,6 @@ use crate::persistence::{
 };
 use crate::segmentation::SegmentationMode;
 use crate::state::{AnalysisState, InfoState, State, View};
-use crate::tui::enter_tui;
 use anyhow::Result;
 
 mod analysis;
@@ -112,9 +112,9 @@ fn main() -> Result<()> {
                 current_view: View::Analysis,
                 db_connection: db,
             };
-            enter_tui(state)
+            TuiApp::new_stdout(state)?.run()
         }
-        _ => enter_tui(State::new(data_conn)?),
+        _ => TuiApp::new_stdout(State::new(data_conn)?)?.run(),
     }
 }
 
