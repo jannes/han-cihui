@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{Context, Result};
 use std::io::Write;
 use std::unimplemented;
-use tui::layout::{Alignment, Constraint, Direction, Layout};
+use tui::layout::{Alignment, Constraint, Direction, Layout, Margin};
 use tui::{
     backend::CrosstermBackend,
     layout::Rect,
@@ -32,7 +32,17 @@ pub(super) fn draw_tab(
     terminal
         .draw(|rect| {
             let size = rect.size();
-            let chunks = Layout::default()
+            let horizontal_chunks = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)].as_ref())
+                .split(size);
+            let main_chunk = horizontal_chunks[0];
+            let action_log_margin = Margin {
+                vertical: 2,
+                horizontal: 0,
+            };
+            let action_log_chunk = horizontal_chunks[1].inner(&action_log_margin);
+            let vertical_chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(2)
                 .constraints(
@@ -43,10 +53,11 @@ pub(super) fn draw_tab(
                     ]
                     .as_ref(),
                 )
-                .split(size);
-            draw_header(rect, &state, chunks[0]);
-            draw_inner(rect, &state, chunks[1]);
-            draw_footer(rect, &state, chunks[2]);
+                .split(main_chunk);
+            draw_header(rect, &state, vertical_chunks[0]);
+            draw_inner(rect, &state, vertical_chunks[1]);
+            draw_footer(rect, &state, vertical_chunks[2]);
+            draw_action_log(rect, &state, action_log_chunk);
         })
         .context("error when drawing terminal")?;
     Ok(())
@@ -87,6 +98,7 @@ fn draw_info(
     let chunks = layout.split(area);
     let block = Block::default()
         .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White))
         .title("My vocabulary");
     let words_text = vocab_info
         .words_description()
@@ -129,6 +141,7 @@ fn draw_analysis_extracted(
     let chunks = layout.split(area);
     let block = Block::default()
         .borders(Borders::ALL)
+        .style(Style::default().fg(Color::White))
         .title("词/字 occurrence info");
     frame.render_widget(block, area);
     let all_chunk = chunks[0];
@@ -232,4 +245,19 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
                 .border_type(BorderType::Plain),
         );
     frame.render_widget(paragraph, area);
+}
+
+fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+    let action_msgs = state
+        .action_log
+        .iter()
+        .rev()
+        .map(|line| Spans::from(vec![Span::raw(line)]))
+        .collect::<Vec<_>>();
+
+    let action_log = Paragraph::new(action_msgs)
+        .block(Block::default().borders(Borders::ALL).title("Action log"))
+        .alignment(Alignment::Left);
+
+    frame.render_widget(action_log, area)
 }

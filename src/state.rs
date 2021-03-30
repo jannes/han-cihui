@@ -25,6 +25,7 @@ pub struct State {
     pub info_state: InfoState,
     pub current_view: View,
     pub db_connection: Arc<Mutex<Connection>>,
+    pub action_log: Vec<String>,
 }
 
 impl State {
@@ -35,6 +36,7 @@ impl State {
             info_state: InfoState::init(db_connection.clone())?,
             current_view: View::Info,
             db_connection,
+            action_log: vec![],
         })
     }
 

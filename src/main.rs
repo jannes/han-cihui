@@ -111,6 +111,7 @@ fn main() -> Result<()> {
                 info_state: InfoState::init(db.clone())?,
                 current_view: View::Analysis,
                 db_connection: db,
+                action_log: vec![],
             };
             TuiApp::new_stdout(state)?.run()
         }

@@ -53,7 +53,11 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     handle_event_analysis_extracted(extracted_state, key_event)
                 }
                 AnalysisState::ExtractedSaving(extracted_saving_state) => {
-                    handle_event_analysis_saving(extracted_saving_state, key_event)?
+                    let (new_state, action_msg) = handle_event_analysis_saving(extracted_saving_state, key_event)?;
+                    if let Some(msg) = action_msg {
+                        state.action_log.push(msg);
+                    }
+                    new_state
                 }
                 x => x,
             }
@@ -120,7 +124,7 @@ fn handle_event_analysis_extracted(
 fn handle_event_analysis_saving(
     mut saving_state: ExtractedSavingState,
     key_event: KeyEvent,
-) -> Result<AnalysisState> {
+) -> Result<(AnalysisState, Option<String>)> {
     match key_event.code {
         KeyCode::Char(c) => {
             saving_state.partial_save_path.push(c);
@@ -129,7 +133,10 @@ fn handle_event_analysis_saving(
             saving_state.partial_save_path.pop();
         }
         KeyCode::Esc => {
-            return Ok(AnalysisState::Extracted(saving_state.extracted_state));
+            return Ok((
+                AnalysisState::Extracted(saving_state.extracted_state),
+                Some("cancel save".to_string()),
+            ));
         }
         KeyCode::Enter => {
             let extracted = &saving_state.extracted_state;
@@ -146,10 +153,14 @@ fn handle_event_analysis_saving(
                 .filter(|item| !known_words.contains(&item.word))
                 .collect();
             save_filtered_extraction_info(book, &unknown_to_save, &saving_state.partial_save_path)?;
+            return Ok((
+                AnalysisState::Extracted(saving_state.extracted_state),
+                Some(format!("saved to {}", &saving_state.partial_save_path)),
+            ));
         }
         _ => {}
     }
-    Ok(AnalysisState::ExtractedSaving(saving_state))
+    Ok((AnalysisState::ExtractedSaving(saving_state), None))
 }
 
 fn handle_event_info(state: &mut State, key_event: KeyEvent) -> Result<()> {

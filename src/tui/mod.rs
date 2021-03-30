@@ -92,9 +92,11 @@ impl Drop for TuiApp {
             .execute(terminal::LeaveAlternateScreen)
             .expect("Could not execute to stdout");
         terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
+        if std::thread::panicking() {
+            eprintln!("exit because of panic, to log the error redirect stderr to a file");
+        }
     }
 }
-
 
 // ------- UTIL FUNCTIONS ---------
 
