@@ -66,7 +66,12 @@ pub(super) fn draw_tab(
 fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     match state.current_view {
         View::Analysis => match &state.analysis_state {
-            AnalysisState::Blank => {}
+            AnalysisState::Blank => {
+                draw_analysis_blank(frame, area);
+            }
+            AnalysisState::Opening(partial_path, _) => {
+                draw_analysis_opening(frame, partial_path, area);
+            }
             AnalysisState::Extracted(extracted_state) => {
                 draw_analysis_extracted(frame, extracted_state, area);
             }
@@ -188,16 +193,50 @@ fn draw_analysis_saving(
     state: &ExtractedSavingState,
     area: Rect,
 ) {
+    draw_centered_input(
+        frame,
+        area,
+        &state.partial_save_path,
+        "Path to save json result file to",
+    )
+}
+
+fn draw_analysis_opening(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    partial_path: &str,
+    area: Rect,
+) {
+    draw_centered_input(frame, area, partial_path, "Path to epub file to open")
+}
+
+fn draw_analysis_blank(frame: &mut Frame<CrosstermBackend<impl Write>>, area: Rect) {
+    let area = get_centered_rect(area);
+    let msg = Spans::from("press [E] to enter path of epub to extract vocab from");
+
+    let input_panel = Paragraph::new(msg)
+        .block(Block::default().borders(Borders::ALL))
+        .style(Style::default().fg(Color::White))
+        .alignment(Alignment::Left);
+
+    frame.render_widget(input_panel, area);
+}
+
+fn draw_centered_input(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    area: Rect,
+    partial_input: &str,
+    box_title: &str,
+) {
     let area = get_centered_rect(area);
     let inner_width = (area.width - 2) as usize;
-    let input = split_each(state.partial_save_path.clone(), inner_width)
+    let input = split_each(partial_input.to_string(), inner_width)
         .into_iter()
         .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
 
     let input_panel = Paragraph::new(input)
         .block(Block::default().borders(Borders::ALL).title(Span::styled(
-            "Path to save results",
+            box_title,
             Style::default().add_modifier(Modifier::BOLD),
         )))
         .style(Style::default().fg(Color::White))
@@ -248,10 +287,24 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 }
 
 fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+    let inner_width = (area.width - 2) as usize;
     let action_msgs = state
         .action_log
         .iter()
+        // latest msgs should be on top
         .rev()
+        // mark each msg with a symbol at beginning for visual aid
+        .map(|msg| format!("+ {}", msg))
+        // split msgs into lines that fit in container
+        .flat_map(|msg| split_each(msg, inner_width))
+        // indent the lines that are continued messages
+        .map(|line| {
+            if !line.starts_with("+ ") {
+                format!("  {}", line)
+            } else {
+                line
+            }
+        })
         .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
 

@@ -57,6 +57,7 @@ pub enum View {
 
 pub enum AnalysisState {
     Blank,
+    Opening(String, SegmentationMode),
     ExtractError,
     Extracting(ExtractingState),
     Extracted(ExtractedState),

@@ -1,13 +1,22 @@
 use crate::{
     analysis::{get_filtered_extraction_items, save_filtered_extraction_info},
     extraction::ExtractionItem,
-    state::{AnalysisState, ExtractedSavingState, ExtractedState, State, View},
+    segmentation::SegmentationMode,
+    state::{
+        AnalysisState, ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState, State,
+        View,
+    },
 };
 use anyhow::Result;
 use crossterm::event;
 use crossterm::event::KeyCode;
 use event::KeyEvent;
-use std::{collections::HashSet, unimplemented};
+use rusqlite::Connection;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    unimplemented,
+};
 
 pub enum Event<I> {
     Input(I),
@@ -46,6 +55,11 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             return Ok(state);
         }
     };
+    let update_action_log = |action_log: &mut Vec<String>, action: Option<String>| {
+        if let Some(action) = action {
+            action_log.push(action);
+        }
+    };
     match state.current_view {
         View::Analysis => {
             state.analysis_state = match state.analysis_state {
@@ -53,12 +67,22 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     handle_event_analysis_extracted(extracted_state, key_event)
                 }
                 AnalysisState::ExtractedSaving(extracted_saving_state) => {
-                    let (new_state, action_msg) = handle_event_analysis_saving(extracted_saving_state, key_event)?;
-                    if let Some(msg) = action_msg {
-                        state.action_log.push(msg);
-                    }
+                    let (new_state, action) =
+                        handle_event_analysis_saving(extracted_saving_state, key_event)?;
+                    update_action_log(&mut state.action_log, action);
                     new_state
                 }
+                AnalysisState::Opening(partial_path, seg_mode) => {
+                    let (new_state, action) = handle_event_analysis_opening(
+                        partial_path,
+                        key_event,
+                        seg_mode,
+                        state.db_connection.clone(),
+                    );
+                    update_action_log(&mut state.action_log, action);
+                    new_state
+                }
+                AnalysisState::Blank => handle_event_analysis_blank(key_event),
                 x => x,
             }
         }
@@ -135,7 +159,7 @@ fn handle_event_analysis_saving(
         KeyCode::Esc => {
             return Ok((
                 AnalysisState::Extracted(saving_state.extracted_state),
-                Some("cancel save".to_string()),
+                Some("canceled save".to_string()),
             ));
         }
         KeyCode::Enter => {
@@ -161,6 +185,47 @@ fn handle_event_analysis_saving(
         _ => {}
     }
     Ok((AnalysisState::ExtractedSaving(saving_state), None))
+}
+
+fn handle_event_analysis_opening(
+    mut partial_path: String,
+    key_event: KeyEvent,
+    seg_mode: SegmentationMode,
+    db: Arc<Mutex<Connection>>,
+) -> (AnalysisState, Option<String>) {
+    match key_event.code {
+        KeyCode::Char(c) => {
+            partial_path.push(c);
+        }
+        KeyCode::Backspace => {
+            partial_path.pop();
+        }
+        KeyCode::Esc => {
+            return (AnalysisState::Blank, Some("canceled open".to_string()));
+        }
+        KeyCode::Enter => {
+            let extract_query = ExtractQuery {
+                filename: partial_path.clone(),
+                segmentation_mode: seg_mode,
+            };
+            let analysis_state = AnalysisState::Extracting(ExtractingState::new(extract_query, db));
+            return (
+                analysis_state,
+                Some(format!("opened {} for analysis", partial_path)),
+            );
+        }
+        _ => {}
+    }
+    (AnalysisState::Opening(partial_path, seg_mode), None)
+}
+
+fn handle_event_analysis_blank(key_event: KeyEvent) -> AnalysisState {
+    match key_event.code {
+        KeyCode::Char('e') => {
+            AnalysisState::Opening("".to_string(), SegmentationMode::DictionaryOnly)
+        }
+        _ => AnalysisState::Blank,
+    }
 }
 
 fn handle_event_info(state: &mut State, key_event: KeyEvent) -> Result<()> {
