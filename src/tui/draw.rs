@@ -204,9 +204,8 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
         View::Exit => 0,
     };
     let tabs = Tabs::new(tab_titles)
-        .block(Block::default().borders(Borders::ALL).title("Tabs"))
+        .block(Block::default().borders(Borders::ALL))
         .select(selected)
-        .style(Style::default().fg(Color::Cyan))
         .highlight_style(
             Style::default()
                 .add_modifier(Modifier::BOLD)
@@ -218,13 +217,13 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let text = match state.current_view {
         View::Analysis => {
-            "[J]: - word occ [K]: + word occ [H]: - char occ [L]: + char occ [S]: save"
+            "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save"
         }
-        View::Info => "[Q]: exit",
+        View::Info => "[S]: sync Anki | [Q]: exit",
         View::Exit => "EXITING",
     };
     let paragraph = Paragraph::new(text)
-        .style(Style::default().fg(Color::LightCyan))
+        .style(Style::default().fg(Color::LightGreen))
         .alignment(Alignment::Center)
         .block(
             Block::default()
