@@ -15,7 +15,7 @@ use crate::{
     analysis::{get_analysis_info, AnalysisInfo, AnalysisQuery},
     ebook::{open_as_book, Book},
     extraction::{extract_vocab, ExtractionResult},
-    persistence::select_known,
+    persistence::{select_known, sync_anki_data},
     segmentation::SegmentationMode,
     vocabulary::{get_vocab_stats, VocabularyInfo},
 };
@@ -57,6 +57,7 @@ pub enum View {
 
 pub enum AnalysisState {
     Blank,
+    // String arg: partial file path
     Opening(String, SegmentationMode),
     ExtractError,
     Extracting(ExtractingState),
@@ -71,14 +72,126 @@ impl Default for AnalysisState {
 }
 
 pub enum InfoState {
-    Info(VocabularyInfo),
-    Syncing,
+    Display(DisplayState),
+    Syncing(SyncingState),
+    // contains the previous vocabulary info
+    SyncError(SyncErrorState),
 }
 
 impl InfoState {
     // getting vocab info is very fast, ok to block main thread
     pub fn init(db_connection: Arc<Mutex<Connection>>) -> Result<Self> {
-        get_vocab_stats(db_connection).map(InfoState::Info)
+        get_vocab_stats(&db_connection.lock().unwrap()).map(|vocab_info| {
+            InfoState::Display(DisplayState {
+                previous_vocab_info: None,
+                vocab_info,
+            })
+        })
+    }
+}
+
+pub struct DisplayState {
+    pub previous_vocab_info: Option<VocabularyInfo>,
+    pub vocab_info: VocabularyInfo,
+}
+
+impl DisplayState {
+    // TODO: make this safe for scenarios where prev vocab info has some field that is larger
+    pub fn get_diff_to_previous(&self) -> Option<VocabularyInfo> {
+        if let Some(prev_vocab_info) = &self.previous_vocab_info {
+            Some(VocabularyInfo {
+                words_total: self.vocab_info.words_total - prev_vocab_info.words_total,
+                words_total_known: self.vocab_info.words_total_known
+                    - prev_vocab_info.words_total_known,
+                words_active: self.vocab_info.words_active - prev_vocab_info.words_active,
+                words_suspended_unknown: self.vocab_info.words_suspended_unknown
+                    - prev_vocab_info.words_suspended_unknown,
+                words_suspended_known: self.vocab_info.words_suspended_known
+                    - prev_vocab_info.words_suspended_known,
+                words_inactive_known: self.vocab_info.words_inactive_known
+                    - prev_vocab_info.words_inactive_known,
+                words_inactive_ignored: self.vocab_info.words_inactive_ignored
+                    - prev_vocab_info.words_inactive_ignored,
+                chars_total_known: self.vocab_info.chars_total_known
+                    - prev_vocab_info.chars_total_known,
+                chars_active_or_suspended_known: self.vocab_info.chars_active_or_suspended_known
+                    - prev_vocab_info.chars_active_or_suspended_known,
+                chars_inactive_known: self.vocab_info.chars_inactive_known
+                    - prev_vocab_info.chars_inactive_known,
+            })
+        } else {
+            None
+        }
+    }
+
+    // new - prev
+    pub fn get_diff_active_words_chars(&self) -> Option<(i64, i64)> {
+        if let Some(prev_vocab_info) = &self.previous_vocab_info {
+            Some((
+                self.vocab_info.words_active as i64 - prev_vocab_info.words_active as i64,
+                self.vocab_info.chars_active_or_suspended_known as i64
+                    - prev_vocab_info.chars_active_or_suspended_known as i64,
+            ))
+        } else {
+            None
+        }
+    }
+}
+
+pub struct SyncingState {
+    pub previous_vocab_info: VocabularyInfo,
+    pub receiver: Receiver<Result<VocabularyInfo>>,
+    pub syncing_thread: JoinHandle<()>,
+    pub start: Instant,
+}
+
+pub struct SyncErrorState {
+    pub previous_vocab_info: VocabularyInfo,
+    pub error_msg: String,
+}
+
+impl SyncingState {
+    pub fn new(previous_vocab_info: VocabularyInfo, db_connection: Arc<Mutex<Connection>>) -> Self {
+        let (tx, rx) = mpsc::channel();
+        let syncing_thread = thread::spawn(move || {
+            let db_conn = db_connection.lock().unwrap();
+            let res = sync_anki_data(&db_conn).and_then(|()| get_vocab_stats(&db_conn));
+            tx.send(res).expect("could not send event");
+        });
+        Self {
+            previous_vocab_info,
+            receiver: rx,
+            syncing_thread,
+            start: Instant::now(),
+        }
+    }
+
+    // update state,
+    // if syncing thread is done return: (new vocab info, diff to old vocab info) tuple
+    pub fn update(&mut self) -> Option<InfoState> {
+        match self.receiver.try_recv() {
+            Ok(res) => match res {
+                Ok(new_vocab_info) => Some(InfoState::Display(DisplayState {
+                    previous_vocab_info: Some(self.previous_vocab_info),
+                    vocab_info: new_vocab_info,
+                })),
+                Err(e) => Some(InfoState::SyncError(SyncErrorState {
+                    previous_vocab_info: self.previous_vocab_info,
+                    error_msg: e.to_string(),
+                })),
+            },
+            Err(e) => match e {
+                mpsc::TryRecvError::Empty => None,
+                mpsc::TryRecvError::Disconnected => Some(InfoState::SyncError(SyncErrorState {
+                    previous_vocab_info: self.previous_vocab_info,
+                    error_msg: e.to_string(),
+                })),
+            },
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
     }
 }
 

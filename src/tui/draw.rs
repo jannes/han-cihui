@@ -2,13 +2,12 @@ use super::{get_analysis_info_table, get_centered_rect, split_each};
 use crate::{
     state::{
         AnalysisState, ExtractedSavingState, ExtractedState, ExtractingState, InfoState, State,
-        View,
+        SyncingState, View,
     },
     vocabulary::VocabularyInfo,
 };
 use anyhow::{Context, Result};
 use std::io::Write;
-use std::unimplemented;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Margin};
 use tui::{
     backend::CrosstermBackend,
@@ -84,8 +83,12 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             }
         },
         View::Info => match &state.info_state {
-            InfoState::Info(vocab_info) => draw_info(frame, vocab_info, area),
-            InfoState::Syncing => draw_info_syncing(frame, state, area),
+            InfoState::Display(display_state) => draw_info(frame, &display_state.vocab_info, area),
+            InfoState::Syncing(syncing_state) => draw_info_syncing(frame, syncing_state, area),
+            // TODO: add visual indicator that sync error occurred
+            InfoState::SyncError(sync_error_state) => {
+                draw_info(frame, &sync_error_state.previous_vocab_info, area)
+            }
         },
         View::Exit => {}
     }
@@ -128,8 +131,24 @@ fn draw_info(
     frame.render_widget(chars_paragraph, chunks[1]);
 }
 
-fn draw_info_syncing(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
-    unimplemented!()
+fn draw_info_syncing(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    state: &SyncingState,
+    area: Rect,
+) {
+    let amount_dots = (state.elapsed().as_secs() % 10) as usize;
+    let text = format!("Syncing {}", ".".repeat(amount_dots));
+    let area = get_centered_rect(area);
+    let paragraph = Paragraph::new(text)
+        .block(
+            Block::default()
+                .title("Syncing vocabulary with Anki")
+                .borders(Borders::ALL),
+        )
+        .alignment(Alignment::Left)
+        .wrap(Wrap { trim: true });
+    frame.render_widget(Clear, area); //this clears out the background
+    frame.render_widget(paragraph, area)
 }
 
 fn draw_analysis_extracted(

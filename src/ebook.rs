@@ -90,7 +90,7 @@ fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book> {
     let author = edoc.mdata("creator");
     let mut chapters: Vec<Chapter> = Vec::new();
     let mut current_resource = edoc.get_current_id();
-    let mut current_chapter = NavPoint {
+    let current_chapter = NavPoint {
         label: "".to_string(),
         content: PathBuf::new(),
         play_order: 0,

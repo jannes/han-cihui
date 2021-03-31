@@ -1,13 +1,14 @@
-use std::{
-    collections::HashSet,
-    sync::{Arc, Mutex},
-};
+use std::collections::HashSet;
 
-use crate::{extraction::word_to_hanzi, persistence::{select_all, AddedExternal, VocabStatus}};
+use crate::{
+    extraction::word_to_hanzi,
+    persistence::{select_all, AddedExternal, VocabStatus},
+};
 use anyhow::Result;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
+#[derive(Clone, Copy)]
 pub struct VocabularyInfo {
     pub words_total: usize,
     pub words_total_known: usize,
@@ -53,8 +54,8 @@ pub fn get_known_chars(known_words: &HashSet<String>) -> HashSet<String> {
         .collect()
 }
 
-pub fn get_vocab_stats(data_conn: Arc<Mutex<Connection>>) -> Result<VocabularyInfo> {
-    let vocabs = select_all(&data_conn.lock().unwrap())?;
+pub fn get_vocab_stats(data_conn: &Connection) -> Result<VocabularyInfo> {
+    let vocabs = select_all(&data_conn)?;
     let amount_total_words = &vocabs.len();
     let mut active: HashSet<String> = HashSet::new();
     let mut suspended_known: HashSet<String> = HashSet::new();

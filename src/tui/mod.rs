@@ -163,8 +163,8 @@ fn get_centered_rect(r: Rect) -> Rect {
 }
 
 // COPIED FROM termchat
-// TODO: check if really needed
-// split messages to fit the width of the ui panel
+// split messages to fit the width of the UI panel
+// to prevent overflow over the UI bounds
 fn split_each(input: String, width: usize) -> Vec<String> {
     let mut splitted = Vec::with_capacity(input.width() / width);
     let mut row = String::new();

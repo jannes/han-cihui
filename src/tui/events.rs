@@ -3,9 +3,10 @@ use crate::{
     extraction::ExtractionItem,
     segmentation::SegmentationMode,
     state::{
-        AnalysisState, ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState, State,
-        View,
+        AnalysisState, ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState,
+        InfoState, State, SyncingState, View,
     },
+    vocabulary::VocabularyInfo,
 };
 use anyhow::Result;
 use crossterm::event;
@@ -15,7 +16,6 @@ use rusqlite::Connection;
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex},
-    unimplemented,
 };
 
 pub enum Event<I> {
@@ -50,6 +50,21 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
                 if let Some(new_state) = extracting_state.update() {
                     state.analysis_state = new_state;
+                }
+            }
+            if let InfoState::Syncing(syncing_state) = &mut state.info_state {
+                if let Some(new_state) = syncing_state.update() {
+                    // if sync successfully completed, add msg to action log
+                    if let InfoState::Display(display_state) = &new_state {
+                        // since it's newly updated, must have Some(previous_vocab_info)
+                        let (active_words_diff, active_known_chars_diff) = display_state.get_diff_active_words_chars()
+                            .expect("newly synced display state should have Some(previous_vocab_info) field");
+                        state.action_log.push(format!(
+                            "synced Anki: {} new words, {} new chars",
+                            active_words_diff, active_known_chars_diff
+                        ));
+                        state.info_state = new_state;
+                    }
                 }
             }
             return Ok(state);
@@ -87,7 +102,21 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             }
         }
         View::Info => {
-            handle_event_info(&mut state, key_event)?;
+            let new_state = match &state.info_state {
+                // allow no tab specific actions during syncing
+                InfoState::Syncing(_) => None,
+                InfoState::Display(display_state) => {
+                    handle_event_info(&state, &display_state.vocab_info, key_event)
+                }
+                InfoState::SyncError(sync_error_state) => {
+                    // TODO: switch back to display state if no new state comes up + append error msg to action log
+                    handle_event_info(&state, &sync_error_state.previous_vocab_info, key_event)
+                }
+            };
+            // switched to syncing state
+            if let Some(new_state) = new_state {
+                state.info_state = new_state;
+            }
         }
         View::Exit => {}
     };
@@ -228,6 +257,16 @@ fn handle_event_analysis_blank(key_event: KeyEvent) -> AnalysisState {
     }
 }
 
-fn handle_event_info(state: &mut State, key_event: KeyEvent) -> Result<()> {
-    unimplemented!()
+fn handle_event_info(
+    state: &State,
+    current_vocab_info: &VocabularyInfo,
+    key_event: KeyEvent,
+) -> Option<InfoState> {
+    match key_event.code {
+        KeyCode::Char('s') => Some(InfoState::Syncing(SyncingState::new(
+            *current_vocab_info,
+            state.db_connection.clone(),
+        ))),
+        _ => None,
+    }
 }

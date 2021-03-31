@@ -2,10 +2,7 @@ use anyhow::Result;
 use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::{HashMap, HashSet};
 
-use crate::{
-    anki_access::{get_zh_notes, NoteStatus},
-    zh_field_to_words, ANKIDB_PATH, NOTE_FIELD_PAIRS,
-};
+use crate::{ANKIDB_PATH, NOTE_FIELD_PAIRS, anki_access::{get_zh_notes, NoteStatus}, zh_field_to_words};
 
 const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status integer not null);\
                            CREATE INDEX word_index ON words(word);\
