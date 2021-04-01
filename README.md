@@ -1,12 +1,21 @@
 # Chinese Vocabulary Manager
-A command-line tool to manage my Mandarin vocabulary
-and extract unknown words from epub books.
+A TUI tool for managing my Mandarin vocabulary and analyzing vocabulary in ebooks (epub).  
+Requires my [han-segmenter](https://github.com/jannes/han-segmenter) CLI tool for text segmentation.
 
-Functions:
-- manually add known words
-- sync with Anki
-- show vocabulary statistics
-- analyze epubs for unknown words/characters statistics
-- export unknown words (with minimum occurrence filter) 
-from epub books to create word lists for later study
+## Vocabulary Managment
+- Manually add known words
+- Synchronize with vocabulary in Anki (flashcard software)
+- Display statistics about known words/characters, which are being actively studied etc.
+- Export known words
 
+## Ebook analysis
+- Analyze vocabulary in epub ebook 
+- Show amount of words/characters known and unknown
+- Supports filtering by word's and character's amount of occurrence within text  
+  (only show words that occur at least x times or/and words that contain  
+   unknown characters which occur at least x times)
+- Export filtered unknown vocabulary ordered by chapters as JSON  
+  (I use another [tool](https://github.com/jannes/zh-vocab-filter) to create word lists to study from this output)
+
+# Demo
+![demo-gif](./demo.gif)
