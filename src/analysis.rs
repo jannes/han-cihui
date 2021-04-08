@@ -1,5 +1,8 @@
-use crate::{extraction::{word_to_hanzi, ExtractionItem, ExtractionResult}, vocabulary::get_known_chars};
 use crate::{ebook::Book, ext_item_set_to_char_freq};
+use crate::{
+    extraction::{word_to_hanzi, ExtractionItem, ExtractionResult},
+    vocabulary::get_known_chars,
+};
 use anyhow::{Context, Result};
 use serde_json::{json, to_writer_pretty, Value};
 use std::{
@@ -155,7 +158,11 @@ pub fn save_filtered_extraction_info(
         "title": &book.title,
         "vocabulary": chapter_jsons
     });
-    to_writer_pretty(&File::create(outpath)?, &output_json).context("failed to write result json")
+    to_writer_pretty(
+        &File::create(outpath).with_context(|| format!("Failed to open file at {}", outpath))?,
+        &output_json,
+    )
+    .context("failed to write result json")
 }
 
 pub fn get_dictionary_words() -> HashSet<String> {

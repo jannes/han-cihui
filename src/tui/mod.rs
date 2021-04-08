@@ -135,6 +135,49 @@ fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
         ])
 }
 
+fn get_analysis_info_percentage_table<'a, 'b, 'c>(info: &'a AnalysisInfo, mic_occ_info: &'b AnalysisInfo) -> Table<'c> {
+    let unknown_words_total_after = (info.unknown_total_words - mic_occ_info.unknown_total_words) as f64 / info.total_words as f64;
+    let unknown_chars_total_after = (info.unknown_total_chars - mic_occ_info.unknown_total_chars) as f64 / info.total_chars as f64;
+    let unknown_words_unique_after = (info.unknown_unique_words - mic_occ_info.unknown_unique_words) as f64 / info.unique_words as f64;
+    let unknown_chars_unique_after = (info.unknown_unique_chars - mic_occ_info.unknown_unique_chars) as f64 / info.unique_chars as f64;
+    let unknown_words_total_before = info.unknown_total_words as f64 / info.total_words as f64;
+    let unknown_chars_total_before = info.unknown_total_chars as f64 / info.total_chars as f64;
+    let unknown_words_unique_before = info.unknown_unique_words as f64 / info.unique_words as f64;
+    let unknown_chars_unique_before = info.unknown_unique_chars as f64 / info.unique_chars as f64;
+    let row1 = Row::new(vec![
+        "total words".to_string(),
+        format!("{:.3}", (1.0 - unknown_words_total_before)),
+        format!("{:.3}", (1.0 - unknown_words_total_after)),
+    ]);
+    let row2 = Row::new(vec![
+        "unique words".to_string(),
+        format!("{:.3}", (1.0 - unknown_words_unique_before)),
+        format!("{:.3}", (1.0 - unknown_words_unique_after)),
+    ]);
+    let row3 = Row::new(vec![
+        "total chars".to_string(),
+        format!("{:.3}", (1.0 - unknown_chars_total_before)),
+        format!("{:.3}", (1.0 - unknown_chars_total_after)),
+    ]);
+    let row4 = Row::new(vec![
+        "unique chars".to_string(),
+        format!("{:.3}", (1.0 - unknown_chars_unique_before)),
+        format!("{:.3}", (1.0 - unknown_chars_unique_after)),
+    ]);
+    Table::new(vec![row1, row2, row3, row4])
+        .header(
+            Row::new(vec!["", "Before", "After"])
+                .style(Style::default().fg(Color::Yellow))
+                .bottom_margin(1),
+        )
+        .block(Block::default().borders(Borders::ALL).title("Known before/after learning"))
+        .widths(&[
+            Constraint::Percentage(34),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+        ])
+}
+
 fn get_centered_rect(r: Rect) -> Rect {
     let percent_y = 50;
     let percent_x = 50;
@@ -162,6 +205,7 @@ fn get_centered_rect(r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
+// TODO: make this work with 汉字, split at grapheme boundaries
 // COPIED FROM termchat
 // split messages to fit the width of the UI panel
 // to prevent overflow over the UI bounds

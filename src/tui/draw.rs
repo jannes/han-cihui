@@ -1,4 +1,4 @@
-use super::{get_analysis_info_table, get_centered_rect, split_each};
+use super::{get_analysis_info_table, get_analysis_info_percentage_table, get_centered_rect, split_each};
 use crate::{
     state::{
         AnalysisState, ExtractedSavingState, ExtractedState, ExtractingState, InfoState, State,
@@ -163,7 +163,14 @@ fn draw_analysis_extracted(
     let layout = Layout::default()
         .direction(Direction::Horizontal)
         .margin(2)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
+        .constraints(
+            [
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(34),
+            ]
+            .as_ref(),
+        );
     let chunks = layout.split(area);
     let block = Block::default()
         .borders(Borders::ALL)
@@ -172,6 +179,7 @@ fn draw_analysis_extracted(
     frame.render_widget(block, area);
     let all_chunk = chunks[0];
     let min_occ_chunk = chunks[1];
+    let perc_chunk = chunks[2];
     frame.render_widget(
         get_analysis_info_table(&info_all, "all words".to_string()),
         all_chunk,
@@ -186,6 +194,10 @@ fn draw_analysis_extracted(
     frame.render_widget(
         get_analysis_info_table(&info_min_occ, min_occ_title),
         min_occ_chunk,
+    );
+    frame.render_widget(
+        get_analysis_info_percentage_table(&info_all, &info_min_occ),
+        perc_chunk,
     );
 }
 
