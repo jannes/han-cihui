@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -17,7 +17,7 @@ use crate::{
     extraction::{extract_vocab, ExtractionResult},
     persistence::{select_known, sync_anki_data},
     segmentation::SegmentationMode,
-    vocabulary::{get_vocab_stats, VocabularyInfo},
+    vocabulary::{get_known_chars, get_vocab_stats, VocabularyInfo},
 };
 
 pub struct State {
@@ -59,7 +59,7 @@ pub enum AnalysisState {
     Blank,
     // String arg: partial file path
     Opening(String, SegmentationMode),
-    ExtractError,
+    ExtractError(anyhow::Error),
     Extracting(ExtractingState),
     Extracted(ExtractedState),
     ExtractedSaving(ExtractedSavingState),
@@ -217,7 +217,7 @@ fn extract(
         .collect();
     let book = open_as_book(filename)?;
     let ext_res = extract_vocab(&book, seg_mode);
-    Ok(ExtractedState::new(book, ext_res, known_words))
+    Ok(ExtractedState::new(book, ext_res, known_words, true))
 }
 
 impl ExtractingState {
@@ -243,11 +243,11 @@ impl ExtractingState {
         match self.receiver.try_recv() {
             Ok(res) => match res {
                 Ok(extracted_state) => Some(AnalysisState::Extracted(extracted_state)),
-                Err(_e) => Some(AnalysisState::ExtractError),
+                Err(e) => Some(AnalysisState::ExtractError(e)),
             },
             Err(e) => match e {
                 mpsc::TryRecvError::Empty => None,
-                mpsc::TryRecvError::Disconnected => Some(AnalysisState::ExtractError),
+                mpsc::TryRecvError::Disconnected => Some(AnalysisState::ExtractError(anyhow!("Segmentation manager thread disconnected"))),
             },
         }
     }
@@ -260,9 +260,11 @@ impl ExtractingState {
 pub struct ExtractedState {
     pub book: Book,
     pub extraction_result: ExtractionResult,
-    pub known_words: HashSet<String>,
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
+    pub known_chars_are_known_words: bool,
+    known_words: HashSet<String>,
+    known_words_chars: HashSet<String>,
 }
 
 pub struct ExtractedSavingState {
@@ -275,6 +277,7 @@ impl ExtractedState {
         book: Book,
         extraction_result: ExtractionResult,
         known_words: HashSet<String>,
+        known_chars_are_known_words: bool,
     ) -> Self {
         let query_all = AnalysisQuery {
             min_occurrence_words: 1,
@@ -299,12 +302,27 @@ impl ExtractedState {
         );
         analysis_infos.insert(query_all, info_all);
         analysis_infos.insert(query_min3, info_min3);
+        let known_words_chars = known_words
+            .union(&get_known_chars(&known_words))
+            .map(|s| s.to_string())
+            .collect::<HashSet<String>>();
         ExtractedState {
             book,
             extraction_result,
-            known_words,
             analysis_query: query_min3,
             analysis_infos,
+            known_chars_are_known_words,
+            known_words,
+            known_words_chars,
+        }
+    }
+    
+    pub fn get_known_words(&self) -> &HashSet<String> {
+        if self.known_chars_are_known_words {
+            &self.known_words_chars
+        }
+        else {
+            &self.known_words
         }
     }
 

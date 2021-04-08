@@ -172,12 +172,17 @@ fn split_each(input: String, width: usize) -> Vec<String> {
     let mut index = 0;
 
     for current_char in input.chars() {
-        if (index != 0 && index == width) || index + current_char.width().unwrap_or(0) > width {
+        if (index != 0 && index == width)
+            || current_char == '\n'
+            || index + current_char.width().unwrap_or(0) > width
+        {
             splitted.push(row.drain(..).collect());
             index = 0;
         }
 
-        row.push(current_char);
+        if current_char != '\n' {
+            row.push(current_char);
+        }
         index += current_char.width().unwrap_or(0);
     }
     // leftover

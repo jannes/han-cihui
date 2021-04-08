@@ -6,7 +6,7 @@ use crate::{
     },
     vocabulary::VocabularyInfo,
 };
-use anyhow::{Context, Result};
+use anyhow::{Context, Error, Result};
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Margin};
 use tui::{
@@ -74,7 +74,9 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             AnalysisState::Extracted(extracted_state) => {
                 draw_analysis_extracted(frame, extracted_state, area);
             }
-            AnalysisState::ExtractError => {}
+            AnalysisState::ExtractError(e) => {
+                draw_analysis_extracted_error(frame, e, area);
+            }
             AnalysisState::Extracting(extracting_state) => {
                 draw_analysis_extracting(frame, extracting_state, area);
             }
@@ -205,6 +207,15 @@ fn draw_analysis_extracting(
         .wrap(Wrap { trim: true });
     frame.render_widget(Clear, area); //this clears out the background
     frame.render_widget(paragraph, area);
+}
+
+fn draw_analysis_extracted_error(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    error: &Error,
+    area: Rect,
+) {
+    let msg = format!("{}\n\n\nPress [E] to open another file", error);
+    draw_centered_input(frame, area, &msg, "Error extracting");
 }
 
 fn draw_analysis_saving(

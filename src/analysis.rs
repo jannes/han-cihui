@@ -26,6 +26,7 @@ pub struct AnalysisInfo {
 }
 
 /// Get all items that fulfill the min occurrence conditions
+#[allow(clippy::unnecessary_unwrap)]
 pub fn get_filtered_extraction_items<'a>(
     extraction_res: &'a ExtractionResult,
     min_occurrence_words: u64,

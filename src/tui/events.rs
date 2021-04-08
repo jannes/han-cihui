@@ -49,6 +49,11 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         Event::Tick => {
             if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
                 if let Some(new_state) = extracting_state.update() {
+                    match &new_state {
+                        AnalysisState::ExtractError(_) => update_action_log(&mut state.action_log, Some("Failed extraction".to_string())),
+                        AnalysisState::Extracted(_) => update_action_log(&mut state.action_log, Some("Extraction success".to_string())),
+                        _ => {}
+                    }
                     state.analysis_state = new_state;
                 }
             }
@@ -70,11 +75,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             return Ok(state);
         }
     };
-    let update_action_log = |action_log: &mut Vec<String>, action: Option<String>| {
-        if let Some(action) = action {
-            action_log.push(action);
-        }
-    };
+
     match state.current_view {
         View::Analysis => {
             state.analysis_state = match state.analysis_state {
@@ -98,6 +99,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     new_state
                 }
                 AnalysisState::Blank => handle_event_analysis_blank(key_event),
+                AnalysisState::ExtractError(_) => handle_event_analysis_blank(key_event),
                 x => x,
             }
         }
@@ -121,6 +123,12 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         View::Exit => {}
     };
     Ok(state)
+}
+
+fn update_action_log(action_log: &mut Vec<String>, action: Option<String>) {
+    if let Some(action) = action {
+        action_log.push(action);
+    }
 }
 
 fn handle_event_analysis_extracted(
@@ -197,10 +205,10 @@ fn handle_event_analysis_saving(
             let filtered_extraction_set = get_filtered_extraction_items(
                 &extracted.extraction_result,
                 extracted.analysis_query.min_occurrence_words,
-                &extracted.known_words,
+                extracted.get_known_words(),
                 extracted.analysis_query.min_occurrence_unknown_chars,
             );
-            let known_words = &saving_state.extracted_state.known_words;
+            let known_words = saving_state.extracted_state.get_known_words();
             let unknown_to_save: HashSet<&ExtractionItem> = filtered_extraction_set
                 .into_iter()
                 .filter(|item| !known_words.contains(&item.word))
@@ -240,7 +248,7 @@ fn handle_event_analysis_opening(
             let analysis_state = AnalysisState::Extracting(ExtractingState::new(extract_query, db));
             return (
                 analysis_state,
-                Some(format!("opened {} for analysis", partial_path)),
+                Some(format!("opening {} for analysis", partial_path)),
             );
         }
         _ => {}

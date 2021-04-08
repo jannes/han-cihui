@@ -32,7 +32,7 @@ impl Book {
 
 pub fn open_as_book(filename: &str) -> Result<Book> {
     let edoc = EpubDoc::new(filename)
-        .map_err(|_e| anyhow!("failed to create EpubDoc for {}", filename))?;
+        .map_err(|e| anyhow!("failed to create EpubDoc for {}, full error: {}", filename, e))?;
 
     get_book_from_edoc(edoc)
 }
