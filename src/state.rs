@@ -43,7 +43,10 @@ impl State {
     /// Is the user currently entering something in an input box?
     pub fn currently_input(&self) -> bool {
         match self.current_view {
-            View::Analysis => matches!(self.analysis_state, AnalysisState::ExtractedSaving(_)),
+            View::Analysis => matches!(
+                self.analysis_state,
+                AnalysisState::Opening(_, _) | AnalysisState::ExtractedSaving(_)
+            ),
             _ => false,
         }
     }
@@ -247,7 +250,9 @@ impl ExtractingState {
             },
             Err(e) => match e {
                 mpsc::TryRecvError::Empty => None,
-                mpsc::TryRecvError::Disconnected => Some(AnalysisState::ExtractError(anyhow!("Segmentation manager thread disconnected"))),
+                mpsc::TryRecvError::Disconnected => Some(AnalysisState::ExtractError(anyhow!(
+                    "Segmentation manager thread disconnected"
+                ))),
             },
         }
     }
@@ -316,12 +321,11 @@ impl ExtractedState {
             known_words_chars,
         }
     }
-    
+
     pub fn get_known_words(&self) -> &HashSet<String> {
         if self.known_chars_are_known_words {
             &self.known_words_chars
-        }
-        else {
+        } else {
             &self.known_words
         }
     }

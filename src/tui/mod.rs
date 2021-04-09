@@ -19,6 +19,7 @@ use tui::{
     style::{Color, Style},
     widgets::{Block, Borders, Row, Table},
 };
+use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use self::{
@@ -135,11 +136,22 @@ fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
         ])
 }
 
-fn get_analysis_info_percentage_table<'a, 'b, 'c>(info: &'a AnalysisInfo, mic_occ_info: &'b AnalysisInfo) -> Table<'c> {
-    let unknown_words_total_after = (info.unknown_total_words - mic_occ_info.unknown_total_words) as f64 / info.total_words as f64;
-    let unknown_chars_total_after = (info.unknown_total_chars - mic_occ_info.unknown_total_chars) as f64 / info.total_chars as f64;
-    let unknown_words_unique_after = (info.unknown_unique_words - mic_occ_info.unknown_unique_words) as f64 / info.unique_words as f64;
-    let unknown_chars_unique_after = (info.unknown_unique_chars - mic_occ_info.unknown_unique_chars) as f64 / info.unique_chars as f64;
+fn get_analysis_info_percentage_table<'a, 'b, 'c>(
+    info: &'a AnalysisInfo,
+    mic_occ_info: &'b AnalysisInfo,
+) -> Table<'c> {
+    let unknown_words_total_after = (info.unknown_total_words - mic_occ_info.unknown_total_words)
+        as f64
+        / info.total_words as f64;
+    let unknown_chars_total_after = (info.unknown_total_chars - mic_occ_info.unknown_total_chars)
+        as f64
+        / info.total_chars as f64;
+    let unknown_words_unique_after = (info.unknown_unique_words - mic_occ_info.unknown_unique_words)
+        as f64
+        / info.unique_words as f64;
+    let unknown_chars_unique_after = (info.unknown_unique_chars - mic_occ_info.unknown_unique_chars)
+        as f64
+        / info.unique_chars as f64;
     let unknown_words_total_before = info.unknown_total_words as f64 / info.total_words as f64;
     let unknown_chars_total_before = info.unknown_total_chars as f64 / info.total_chars as f64;
     let unknown_words_unique_before = info.unknown_unique_words as f64 / info.unique_words as f64;
@@ -170,7 +182,11 @@ fn get_analysis_info_percentage_table<'a, 'b, 'c>(info: &'a AnalysisInfo, mic_oc
                 .style(Style::default().fg(Color::Yellow))
                 .bottom_margin(1),
         )
-        .block(Block::default().borders(Borders::ALL).title("Known before/after learning"))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Known before/after learning"),
+        )
         .widths(&[
             Constraint::Percentage(34),
             Constraint::Percentage(33),
@@ -205,33 +221,57 @@ fn get_centered_rect(r: Rect) -> Rect {
         .split(popup_layout[1])[1]
 }
 
-// TODO: make this work with 汉字, split at grapheme boundaries
-// COPIED FROM termchat
-// split messages to fit the width of the UI panel
-// to prevent overflow over the UI bounds
-fn split_each(input: String, width: usize) -> Vec<String> {
-    let mut splitted = Vec::with_capacity(input.width() / width);
+// split messages to fit the width of the UI panel to prevent overflow over the UI bounds
+// if not None, add prefix to first line and indent next lines
+fn split_to_lines(input: &str, width: usize, prefix: Option<&str>) -> Vec<String> {
+    let mut split = Vec::with_capacity(input.width_cjk() / width);
     let mut row = String::new();
-
     let mut index = 0;
+    let mut is_first_line = true;
+    
+    // depending on prefix arg, calculate actual text width and indent of next lines
+    let (text_width, prefix_first_line, prefix_next_lines) = match prefix {
+        Some(p) => {
+            let prefix_width = p.width_cjk();
+            (
+                width - prefix_width,
+                p.to_string(),
+                " ".repeat(prefix_width),
+            )
+        }
+        None => (width, "".to_string(), "".to_string()),
+    };
 
-    for current_char in input.chars() {
-        if (index != 0 && index == width)
-            || current_char == '\n'
-            || index + current_char.width().unwrap_or(0) > width
+    // transforming line to prefixed line
+    let get_prefixed_line = |row: &mut String, is_first_line: bool| {
+        if is_first_line {
+            format!("{}{}", prefix_first_line, &row.drain(..).collect::<String>())
+        } else {
+            format!("{}{}", prefix_next_lines, &row.drain(..).collect::<String>())
+        }
+    };
+
+    for current_char in input.graphemes(true).collect::<Vec<&str>>() {
+        // if adding a character would go out of bounds, create new line
+        if (index != 0 && index == text_width)
+            || current_char == "\n"
+            || index + current_char.width_cjk() > text_width
         {
-            splitted.push(row.drain(..).collect());
+            split.push(get_prefixed_line(&mut row, is_first_line));
             index = 0;
+            is_first_line = false;
         }
 
-        if current_char != '\n' {
-            row.push(current_char);
+        // ignore new line character, already accounted for by splitting
+        if current_char != "\n" {
+            row.push_str(current_char);
         }
-        index += current_char.width().unwrap_or(0);
+        index += current_char.width_cjk();
     }
-    // leftover
+
+    // last line
     if !row.is_empty() {
-        splitted.push(row.drain(..).collect());
+        split.push(get_prefixed_line(&mut row, is_first_line));
     }
-    splitted
+    split
 }

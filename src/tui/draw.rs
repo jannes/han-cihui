@@ -1,4 +1,6 @@
-use super::{get_analysis_info_table, get_analysis_info_percentage_table, get_centered_rect, split_each};
+use super::{
+    get_analysis_info_percentage_table, get_analysis_info_table, get_centered_rect, split_to_lines,
+};
 use crate::{
     state::{
         AnalysisState, ExtractedSavingState, ExtractedState, ExtractingState, InfoState, State,
@@ -271,7 +273,7 @@ fn draw_centered_input(
 ) {
     let area = get_centered_rect(area);
     let inner_width = (area.width - 2) as usize;
-    let input = split_each(partial_input.to_string(), inner_width)
+    let input = split_to_lines(partial_input, inner_width, None)
         .into_iter()
         .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
@@ -335,18 +337,8 @@ fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &Stat
         .iter()
         // latest msgs should be on top
         .rev()
-        // mark each msg with a symbol at beginning for visual aid
-        .map(|msg| format!("+ {}", msg))
         // split msgs into lines that fit in container
-        .flat_map(|msg| split_each(msg, inner_width))
-        // indent the lines that are continued messages
-        .map(|line| {
-            if !line.starts_with("+ ") {
-                format!("  {}", line)
-            } else {
-                line
-            }
-        })
+        .flat_map(|msg| split_to_lines(msg, inner_width, Some("+ ")))
         .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
 
