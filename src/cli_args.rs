@@ -47,7 +47,7 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .short("d")
                         .long("dict-only")
                         .help("segmentation mode: dict-only"),
-                )
+                ),
         )
         .subcommand(SubCommand::with_name("show").about("Prints all known words"))
         .get_matches()

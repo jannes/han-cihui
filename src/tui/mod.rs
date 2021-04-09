@@ -20,7 +20,7 @@ use tui::{
     widgets::{Block, Borders, Row, Table},
 };
 use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use unicode_width::UnicodeWidthStr;
 
 use self::{
     draw::draw_tab,
@@ -228,7 +228,7 @@ fn split_to_lines(input: &str, width: usize, prefix: Option<&str>) -> Vec<String
     let mut row = String::new();
     let mut index = 0;
     let mut is_first_line = true;
-    
+
     // depending on prefix arg, calculate actual text width and indent of next lines
     let (text_width, prefix_first_line, prefix_next_lines) = match prefix {
         Some(p) => {
@@ -245,9 +245,17 @@ fn split_to_lines(input: &str, width: usize, prefix: Option<&str>) -> Vec<String
     // transforming line to prefixed line
     let get_prefixed_line = |row: &mut String, is_first_line: bool| {
         if is_first_line {
-            format!("{}{}", prefix_first_line, &row.drain(..).collect::<String>())
+            format!(
+                "{}{}",
+                prefix_first_line,
+                &row.drain(..).collect::<String>()
+            )
         } else {
-            format!("{}{}", prefix_next_lines, &row.drain(..).collect::<String>())
+            format!(
+                "{}{}",
+                prefix_next_lines,
+                &row.drain(..).collect::<String>()
+            )
         }
     };
 

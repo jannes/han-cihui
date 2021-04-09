@@ -50,8 +50,14 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
                 if let Some(new_state) = extracting_state.update() {
                     match &new_state {
-                        AnalysisState::ExtractError(_) => update_action_log(&mut state.action_log, Some("Failed extraction".to_string())),
-                        AnalysisState::Extracted(_) => update_action_log(&mut state.action_log, Some("Extraction success".to_string())),
+                        AnalysisState::ExtractError(_) => update_action_log(
+                            &mut state.action_log,
+                            Some("Failed extraction".to_string()),
+                        ),
+                        AnalysisState::Extracted(_) => update_action_log(
+                            &mut state.action_log,
+                            Some("Extraction success".to_string()),
+                        ),
                         _ => {}
                     }
                     state.analysis_state = new_state;

@@ -2,7 +2,10 @@ use anyhow::Result;
 use rusqlite::{params, Connection, NO_PARAMS};
 use std::collections::{HashMap, HashSet};
 
-use crate::{ANKIDB_PATH, NOTE_FIELD_PAIRS, anki_access::{get_zh_notes, NoteStatus}, zh_field_to_words};
+use crate::{
+    anki_access::{get_zh_notes, NoteStatus},
+    zh_field_to_words, ANKIDB_PATH, NOTE_FIELD_PAIRS,
+};
 
 const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status integer not null);\
                            CREATE INDEX word_index ON words(word);\
@@ -15,7 +18,8 @@ const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status int
                             );";
 const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status) VALUES (?1, ?2)";
 const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status) VALUES (?1, ?2)";
-const INSERT_EVENT_QUERY: &str = "INSERT INTO add_events (date, kind, added_words, added_chars) VALUES (?1, ?2, ?3, ?4)";
+const INSERT_EVENT_QUERY: &str =
+    "INSERT INTO add_events (date, kind, added_words, added_chars) VALUES (?1, ?2, ?3, ?4)";
 
 const STATUS_ACTIVE: i64 = 0;
 const STATUS_SUSPENDED_KNOWN: i64 = 1;
@@ -60,12 +64,18 @@ pub fn add_external_words(
     match kind {
         AddedExternal::Known => {
             for word in words {
-                conn.execute(INSERT_WORD_QUERY, params![word, STATUS_ADDED_EXTERNAL_KNOWN])?;
+                conn.execute(
+                    INSERT_WORD_QUERY,
+                    params![word, STATUS_ADDED_EXTERNAL_KNOWN],
+                )?;
             }
         }
         AddedExternal::Ignored => {
             for word in words {
-                conn.execute(INSERT_WORD_QUERY, params![word, STATUS_ADDED_EXTERNAL_IGNORED])?;
+                conn.execute(
+                    INSERT_WORD_QUERY,
+                    params![word, STATUS_ADDED_EXTERNAL_IGNORED],
+                )?;
             }
         }
     }

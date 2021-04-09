@@ -10,9 +10,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::tui::TuiApp;
 use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
-use crate::tui::TuiApp;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::anki_access::{NoteStatus, ZhNote};
