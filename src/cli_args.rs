@@ -49,6 +49,25 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .help("segmentation mode: dict-only"),
                 ),
         )
-        .subcommand(SubCommand::with_name("show").about("Prints all known words"))
+        .subcommand(
+            SubCommand::with_name("show")
+                .about("Prints vocabulary items (known words by default)")
+                .arg(
+                    Arg::with_name("status")
+                        .takes_value(true)
+                        .required(false)
+                        .short("s")
+                        .long("status")
+                        .help("status of vocab items, one of 'known_external', 'suspended_unknown'"),
+                )
+                .arg(
+                    Arg::with_name("kind")
+                        .takes_value(true)
+                        .required(false)
+                        .short("k")
+                        .long("kind")
+                        .help("one of 'words', 'chars'"),
+                ),
+        )
         .get_matches()
 }

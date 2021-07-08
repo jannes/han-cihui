@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::tui::TuiApp;
+use cli_commands::show;
 use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
 use unicode_segmentation::UnicodeSegmentation;
@@ -19,7 +20,7 @@ use crate::anki_access::{NoteStatus, ZhNote};
 use crate::cli_args::get_arg_matches;
 use crate::extraction::{word_to_hanzi, ExtractionItem};
 use crate::persistence::{
-    add_external_words, create_table, select_all, select_known, sync_anki_data, AddedExternal,
+    add_external_words, create_table, select_all, sync_anki_data, AddedExternal,
     VocabStatus,
 };
 use crate::segmentation::SegmentationMode;
@@ -29,6 +30,7 @@ use anyhow::Result;
 mod analysis;
 mod anki_access;
 mod cli_args;
+mod cli_commands;
 mod ebook;
 mod extraction;
 mod persistence;
@@ -84,11 +86,8 @@ fn main() -> Result<()> {
             }
         }
         Some("show") => {
-            let known_words = select_known(&data_conn)?;
-            for word in known_words {
-                println!("{}", word);
-            }
-            Ok(())
+            let matches = matches.subcommand_matches("show").unwrap();
+            show(&matches, &data_conn)
         }
         Some("analyze") => {
             let subcommand_matches = matches.subcommand_matches("analyze").unwrap();

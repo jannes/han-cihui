@@ -39,6 +39,31 @@ pub enum VocabStatus {
     AddedExternal(AddedExternal),
 }
 
+impl VocabStatus {
+    fn from_i64(i: i64) -> Option<Self> {
+        match i {
+            STATUS_ACTIVE => Some(VocabStatus::Active),
+            STATUS_SUSPENDED_KNOWN => Some(VocabStatus::SuspendedKnown),
+            STATUS_SUSPENDED_UNKNOWN => Some(VocabStatus::SuspendedUnknown),
+            STATUS_ADDED_EXTERNAL_KNOWN => Some(VocabStatus::AddedExternal(AddedExternal::Known)),
+            STATUS_ADDED_EXTERNAL_IGNORED => {
+                Some(VocabStatus::AddedExternal(AddedExternal::Ignored))
+            }
+            _ => None,
+        }
+    }
+
+    fn to_i64(&self) -> i64 {
+        match self {
+            VocabStatus::Active => STATUS_ACTIVE,
+            VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,
+            VocabStatus::SuspendedUnknown => STATUS_SUSPENDED_UNKNOWN,
+            VocabStatus::AddedExternal(AddedExternal::Known) => STATUS_ADDED_EXTERNAL_KNOWN,
+            VocabStatus::AddedExternal(AddedExternal::Ignored) => STATUS_ADDED_EXTERNAL_IGNORED,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum AddedExternal {
     Known,
@@ -85,7 +110,7 @@ pub fn add_external_words(
 pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
     for item in vocab {
         let word = &item.word;
-        let status_int = status_to_int(item.status);
+        let status_int = item.status.to_i64();
         conn.execute(OVERWRITE_WORD_QUERY, params![word, status_int])?;
     }
     Ok(())
@@ -98,22 +123,32 @@ pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
         .query_map(NO_PARAMS, |row| {
             Ok(Vocab {
                 word: row.get(0)?,
-                status: int_to_status(row.get(1)?).unwrap(),
+                status: VocabStatus::from_i64(row.get(1)?).unwrap(),
             })
         })?
         .collect::<Result<Vec<Vocab>, _>>();
     Ok(vocab?.into_iter().collect())
 }
 
-pub fn select_known(conn: &Connection) -> Result<Vec<String>> {
+pub fn select_by_status(conn: &Connection, status: VocabStatus) -> Result<HashSet<String>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT (word) FROM words WHERE status = {}",
+        status.to_i64()
+    ))?;
+    let known_words = stmt
+        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))?
+        .collect::<Result<HashSet<String>, _>>()?;
+    Ok(known_words)
+}
+
+pub fn select_known(conn: &Connection) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status != {}",
         STATUS_SUSPENDED_UNKNOWN
     ))?;
-    // can not collect as hash set somehow?
     let known_words = stmt
         .query_map(NO_PARAMS, |row| Ok(row.get(0)?))?
-        .collect::<Result<Vec<String>, _>>()?;
+        .collect::<Result<HashSet<String>, _>>()?;
     Ok(known_words)
 }
 
@@ -134,25 +169,4 @@ pub fn sync_anki_data(data_conn: &Connection) -> Result<()> {
         })
         .collect();
     insert_overwrite(data_conn, &anki_vocab)
-}
-
-fn int_to_status(status: i64) -> Option<VocabStatus> {
-    match status {
-        STATUS_ACTIVE => Some(VocabStatus::Active),
-        STATUS_SUSPENDED_KNOWN => Some(VocabStatus::SuspendedKnown),
-        STATUS_SUSPENDED_UNKNOWN => Some(VocabStatus::SuspendedUnknown),
-        STATUS_ADDED_EXTERNAL_KNOWN => Some(VocabStatus::AddedExternal(AddedExternal::Known)),
-        STATUS_ADDED_EXTERNAL_IGNORED => Some(VocabStatus::AddedExternal(AddedExternal::Ignored)),
-        _ => None,
-    }
-}
-
-fn status_to_int(status: VocabStatus) -> i64 {
-    match status {
-        VocabStatus::Active => STATUS_ACTIVE,
-        VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,
-        VocabStatus::SuspendedUnknown => STATUS_SUSPENDED_UNKNOWN,
-        VocabStatus::AddedExternal(AddedExternal::Known) => STATUS_ADDED_EXTERNAL_KNOWN,
-        VocabStatus::AddedExternal(AddedExternal::Ignored) => STATUS_ADDED_EXTERNAL_IGNORED,
-    }
 }
