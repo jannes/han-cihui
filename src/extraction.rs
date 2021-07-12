@@ -13,26 +13,18 @@ pub struct ExtractionItem {
 }
 
 pub struct ExtractionResult {
-    pub(crate) word_count: u64,
-    pub(crate) character_count: u64,
     pub(crate) vocabulary_info: HashSet<ExtractionItem>,
-    // char is always 4 bytes unicode scalar, not necessarily an actual full character
-    pub(crate) char_freq_map: HashMap<String, u64>,
 }
 
 pub fn extract_vocab(book: &Book, segmentation_mode: SegmentationMode) -> ExtractionResult {
     let word_occur_freq = extract(book, segmentation_mode);
-    let mut word_count: u64 = 0;
-    let mut character_count: u64 = 0;
     let mut vocabulary_info: HashSet<ExtractionItem> = HashSet::new();
     let mut char_freq_map: HashMap<String, u64> = HashMap::new();
 
     for (word, (chapter, frequency)) in word_occur_freq {
         if contains_hanzi(&word) {
-            word_count += frequency;
             let characters = word_to_hanzi(&word);
             for character in characters {
-                character_count += frequency;
                 if char_freq_map.contains_key(character) {
                     let v = char_freq_map.get_mut(character).unwrap();
                     *v += frequency;
@@ -50,10 +42,7 @@ pub fn extract_vocab(book: &Book, segmentation_mode: SegmentationMode) -> Extrac
     }
 
     ExtractionResult {
-        word_count,
-        character_count,
         vocabulary_info,
-        char_freq_map,
     }
 }
 

@@ -99,34 +99,6 @@ pub struct DisplayState {
 }
 
 impl DisplayState {
-    // TODO: make this safe for scenarios where prev vocab info has some field that is larger
-    pub fn get_diff_to_previous(&self) -> Option<VocabularyInfo> {
-        if let Some(prev_vocab_info) = &self.previous_vocab_info {
-            Some(VocabularyInfo {
-                words_total: self.vocab_info.words_total - prev_vocab_info.words_total,
-                words_total_known: self.vocab_info.words_total_known
-                    - prev_vocab_info.words_total_known,
-                words_active: self.vocab_info.words_active - prev_vocab_info.words_active,
-                words_suspended_unknown: self.vocab_info.words_suspended_unknown
-                    - prev_vocab_info.words_suspended_unknown,
-                words_suspended_known: self.vocab_info.words_suspended_known
-                    - prev_vocab_info.words_suspended_known,
-                words_inactive_known: self.vocab_info.words_inactive_known
-                    - prev_vocab_info.words_inactive_known,
-                words_inactive_ignored: self.vocab_info.words_inactive_ignored
-                    - prev_vocab_info.words_inactive_ignored,
-                chars_total_known: self.vocab_info.chars_total_known
-                    - prev_vocab_info.chars_total_known,
-                chars_active_or_suspended_known: self.vocab_info.chars_active_or_suspended_known
-                    - prev_vocab_info.chars_active_or_suspended_known,
-                chars_inactive_known: self.vocab_info.chars_inactive_known
-                    - prev_vocab_info.chars_inactive_known,
-            })
-        } else {
-            None
-        }
-    }
-
     // new - prev
     pub fn get_diff_active_words_chars(&self) -> Option<(i64, i64)> {
         if let Some(prev_vocab_info) = &self.previous_vocab_info {

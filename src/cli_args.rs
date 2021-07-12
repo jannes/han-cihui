@@ -22,17 +22,7 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                 ),
         )
         .subcommand(SubCommand::with_name("sync").about("Syncs data with Anki"))
-        .subcommand(
-            SubCommand::with_name("stats")
-                .about("Prints vocabulary statistiscs")
-                .arg(
-                    Arg::with_name("anki only")
-                        .required(false)
-                        .short("a")
-                        .long("anki")
-                        .help("print anki statistics only"),
-                ),
-        )
+        .subcommand(SubCommand::with_name("anki-stats").about("Prints anki statistics"))
         .subcommand(
             SubCommand::with_name("analyze")
                 .about("Analyze vocabulary of epub")
@@ -58,7 +48,9 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .required(false)
                         .short("s")
                         .long("status")
-                        .help("status of vocab items, one of 'known_external', 'suspended_unknown'"),
+                        .help(
+                            "status of vocab items, one of 'known_external', 'suspended_unknown'",
+                        ),
                 )
                 .arg(
                     Arg::with_name("kind")

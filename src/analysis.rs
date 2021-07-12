@@ -1,4 +1,4 @@
-use crate::{ebook::Book, ext_item_set_to_char_freq};
+use crate::ebook::Book;
 use crate::{
     extraction::{word_to_hanzi, ExtractionItem, ExtractionResult},
     vocabulary::get_known_chars,
@@ -163,4 +163,22 @@ pub fn save_filtered_extraction_info(
         &output_json,
     )
     .context("failed to write result json")
+}
+
+fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<String, u64> {
+    let mut char_freq_map: HashMap<String, u64> = HashMap::new();
+    ext_items
+        .iter()
+        .map(|item| (word_to_hanzi(&item.word), item.frequency))
+        .for_each(|(hanzis, frequency)| {
+            for hanzi in hanzis {
+                if char_freq_map.contains_key(hanzi) {
+                    let v = char_freq_map.get_mut(hanzi).unwrap();
+                    *v += frequency;
+                } else {
+                    char_freq_map.insert(hanzi.to_string(), frequency);
+                }
+            }
+        });
+    char_freq_map
 }

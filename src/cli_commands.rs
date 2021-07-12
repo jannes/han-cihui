@@ -1,11 +1,20 @@
-use std::collections::HashSet;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+};
 
 use anyhow::Result;
 use clap::ArgMatches;
 use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::persistence::{select_all, select_by_status, select_known, AddedExternal, VocabStatus};
+use crate::{
+    anki_access::{self, NoteStatus, ZhNote},
+    persistence::{
+        add_external_words, select_all, select_by_status, select_known, AddedExternal, VocabStatus,
+    },
+    NOTE_FIELD_PAIRS, WORD_DELIMITERS,
+};
 
 pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
     let target_words = if matches.is_present("status") {
@@ -68,4 +77,66 @@ pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
         println!("{}", item);
     }
     Ok(())
+}
+
+pub fn print_anki_stats(conn: &Connection) -> Result<()> {
+    let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
+    let zh_notes = anki_access::get_zh_notes(&conn, &note_field_map)?;
+
+    let active_words = notes_to_words_filtered(&zh_notes, NoteStatus::Active);
+    let inactive_unknown_words = notes_to_words_filtered(&zh_notes, NoteStatus::SuspendedUnknown);
+    let inactive_known_words = notes_to_words_filtered(&zh_notes, NoteStatus::SuspendedKnown);
+
+    let active_chars: HashSet<char> = active_words.iter().flat_map(|word| word.chars()).collect();
+
+    println!("total notes: {}", zh_notes.len());
+    println!("active: {}", active_words.len());
+    println!("active characters: {}", active_chars.len());
+    println!("inactive known: {}", inactive_known_words.len());
+    println!("inactive unknown: {}", inactive_unknown_words.len());
+
+    for word in &inactive_unknown_words {
+        println!("{}", word);
+    }
+    Ok(())
+}
+
+pub fn perform_add_external(
+    data_conn: &Connection,
+    filename: &str,
+    kind: AddedExternal,
+) -> Result<()> {
+    let file_str = fs::read_to_string(filename)?;
+    let words_to_add: HashSet<String> = file_str
+        .split('\n')
+        .map(|line| String::from(line.trim()))
+        .filter(|trimmed| !trimmed.is_empty())
+        .collect();
+    let words_known: HashSet<String> = select_all(data_conn)?
+        .iter()
+        .map(|vocab| String::from(&vocab.word))
+        .collect();
+    let words_unknown: &HashSet<&str> = &words_to_add
+        .difference(&words_known)
+        .map(|s| s.as_str())
+        .collect();
+    println!("amount saved: {}", &words_known.len());
+    println!("amount to add: {}", &words_to_add.len());
+    println!("amount new: {}", &words_unknown.len());
+    add_external_words(&data_conn, words_unknown, kind)
+}
+
+pub fn zh_field_to_words(field: &str) -> Vec<String> {
+    field
+        .split(&WORD_DELIMITERS[..])
+        .map(String::from)
+        .collect()
+}
+
+fn notes_to_words_filtered(notes: &HashSet<ZhNote>, status: NoteStatus) -> HashSet<String> {
+    notes
+        .iter()
+        .filter(|note| note.status == status)
+        .flat_map(|note| zh_field_to_words(&note.zh_field))
+        .collect()
 }
