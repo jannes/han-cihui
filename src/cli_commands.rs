@@ -26,42 +26,38 @@ pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
             "words" => target_words,
             "chars" => {
                 let vocabs = select_all(&conn)?;
-                let mut active: HashSet<String> = HashSet::new();
-                let mut suspended_known: HashSet<String> = HashSet::new();
-                let mut inactive: HashSet<String> = HashSet::new();
+                let mut active_or_known: HashSet<String> = HashSet::new();
+                let mut active_or_known_characters: HashSet<&str> = HashSet::new();
+                let mut target_characters: HashSet<String> = HashSet::new();
                 for vocab in vocabs {
                     match vocab.status {
                         VocabStatus::Active => {
-                            active.insert(vocab.word);
+                            active_or_known.insert(vocab.word);
                         }
                         VocabStatus::SuspendedKnown => {
-                            suspended_known.insert(vocab.word);
-                        }
-                        VocabStatus::AddedExternal(AddedExternal::Known) => {
-                            inactive.insert(vocab.word);
+                            active_or_known.insert(vocab.word);
                         }
                         _ => {}
                     };
                 }
-                let mut active_or_known_characters: HashSet<&str> = HashSet::new();
-                let mut inactive_characters: HashSet<String> = HashSet::new();
-                for word in &active.union(&suspended_known).collect::<Vec<&String>>() {
+                for word in &active_or_known {
                     let chars: Vec<&str> =
                         UnicodeSegmentation::graphemes(word.as_str(), true).collect();
                     for char in chars {
                         active_or_known_characters.insert(char);
                     }
                 }
-                for word in &inactive {
+                // include only characters that are neither active nor guaranteed known
+                for word in &target_words {
                     let chars: Vec<&str> =
                         UnicodeSegmentation::graphemes(word.as_str(), true).collect();
                     for char in chars {
                         if !active_or_known_characters.contains(char) {
-                            inactive_characters.insert(char.to_string());
+                            target_characters.insert(char.to_string());
                         }
                     }
                 }
-                inactive_characters
+                target_characters
             }
             _ => panic!("invalid vocab kind, expected 'words' or 'chars'"),
         }
