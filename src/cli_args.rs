@@ -21,7 +21,6 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .help("path to file with one word per line"),
                 ),
         )
-        .subcommand(SubCommand::with_name("sync").about("Syncs data with Anki"))
         .subcommand(SubCommand::with_name("anki-stats").about("Prints anki statistics"))
         .subcommand(
             SubCommand::with_name("analyze")
