@@ -2,7 +2,10 @@ use anyhow::{anyhow, Context, Result};
 use epub::doc::{EpubDoc, NavPoint};
 use scraper::Html;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct Chapter {
@@ -28,6 +31,69 @@ impl Book {
     pub fn as_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
+}
+
+pub struct FlattenedBook {
+    pub title: String,
+    pub author: Option<String>,
+    pub chapters: Vec<FlatChapter>,
+}
+
+pub struct FlatChapter {
+    pub title: String,
+    pub text: String,
+}
+
+pub fn flatten_chapter(chapter: &epubparse::types::Chapter) -> FlatChapter {
+    let title = chapter.title.to_string();
+    let mut text = vec![chapter.text.to_string()];
+    for subchapter in &chapter.subchapters {
+        let flattened = flatten_chapter(subchapter);
+        text.push(flattened.title);
+        text.push(flattened.text);
+    }
+    FlatChapter {
+        title,
+        text: text.join("\n"),
+    }
+}
+
+pub fn flatten_book(book: epubparse::types::Book, depth: u32) -> FlattenedBook {
+    fn flatten_subchapters(chapter: &epubparse::types::Chapter, depth: u32) -> Vec<FlatChapter> {
+        if depth == 1 {
+            vec![flatten_chapter(chapter)]
+        } else {
+            let flattened = FlatChapter {
+                title: chapter.title.to_string(),
+                text: chapter.text.to_string(),
+            };
+            let flat_subchapters: Vec<FlatChapter> = chapter
+                .subchapters
+                .iter()
+                .flat_map(|ch| flatten_subchapters(ch, depth - 1))
+                .collect();
+            let mut flattened = vec![flattened];
+            flattened.extend(flat_subchapters);
+            flattened
+        }
+    }
+
+    let flat_chapters = book
+        .chapters
+        .iter()
+        .flat_map(|chapter| flatten_subchapters(chapter, depth))
+        .collect();
+
+    FlattenedBook {
+        title: book.title,
+        author: book.author,
+        chapters: flat_chapters,
+    }
+}
+
+pub fn open_epub_as_book(filename: &str) -> Result<epubparse::types::Book> {
+    let bytes = fs::read(filename)?;
+    Ok(epubparse::epub_to_book(&bytes)?)
 }
 
 pub fn open_as_book(filename: &str) -> Result<Book> {
@@ -57,10 +123,10 @@ fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &Path) -> Option<NavPoin
     // choose the last match, which should be the subchapter,
     // as the chapter is just a container for the subchapters (usually)
     matches.last().map(|navp| NavPoint {
-            label: navp.label.to_owned(),
-            content: navp.content.to_owned(),
-            play_order: navp.play_order,
-        })
+        label: navp.label.to_owned(),
+        content: navp.content.to_owned(),
+        play_order: navp.play_order,
+    })
 }
 
 // TODO: make this work

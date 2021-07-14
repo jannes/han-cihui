@@ -19,3 +19,4 @@ anyhow = "1.0.32"
 tui = {version = "0.15.0", default-features = false, features = ['crossterm', 'serde'] }
 crossterm = { version = "0.20", features = [ "serde" ] }
 unicode-width = "0.1.8"
+epubparse = "0.2.1"
