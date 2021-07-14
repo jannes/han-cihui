@@ -5,7 +5,7 @@ authors = ["jannes <jannes.dev@posteo.net>"]
 edition = "2018"
 
 [dependencies]
-rusqlite = "0.23.1"
+rusqlite = "0.25.3"
 serde_json = "1.0.53"
 clap = "2.33.1"
 epub = { git = "https://github.com/jannes/epub-rs", branch = "v1.2.1-allow_missing_play_order" }

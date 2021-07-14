@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use epub::doc::{EpubDoc, NavPoint};
 use scraper::Html;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize)]
 pub struct Chapter {
@@ -42,7 +42,7 @@ pub fn open_as_book(filename: &str) -> Result<Book> {
     get_book_from_edoc(edoc)
 }
 
-fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &PathBuf) -> Option<NavPoint> {
+fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &Path) -> Option<NavPoint> {
     let matches: Vec<&NavPoint> = edoc
         .toc
         .iter()
@@ -56,15 +56,11 @@ fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &PathBuf) -> Option<NavP
     // if there are are multiple matches they are most likely chapter and subchapter
     // choose the last match, which should be the subchapter,
     // as the chapter is just a container for the subchapters (usually)
-    if let Some(navp) = matches.last() {
-        Some(NavPoint {
+    matches.last().map(|navp| NavPoint {
             label: navp.label.to_owned(),
             content: navp.content.to_owned(),
             play_order: navp.play_order,
         })
-    } else {
-        None
-    }
 }
 
 // TODO: make this work

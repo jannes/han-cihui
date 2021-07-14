@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{params, Connection, NO_PARAMS};
+use rusqlite::{params, Connection};
 use std::collections::{HashMap, HashSet};
 
 use crate::{ANKIDB_PATH, NOTE_FIELD_PAIRS, anki_access::{get_zh_notes, NoteStatus}, cli_commands::zh_field_to_words};
@@ -50,7 +50,7 @@ impl VocabStatus {
         }
     }
 
-    fn to_i64(&self) -> i64 {
+    fn to_i64(self) -> i64 {
         match self {
             VocabStatus::Active => STATUS_ACTIVE,
             VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,
@@ -74,7 +74,7 @@ pub struct Vocab {
 }
 
 pub fn create_table(conn: &Connection) -> Result<()> {
-    conn.execute(SETUP_QUERY, NO_PARAMS)?;
+    conn.execute(SETUP_QUERY, [])?;
     Ok(())
 }
 
@@ -117,7 +117,7 @@ pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
     let mut stmt = conn.prepare("SELECT * FROM words")?;
     // can not collect as hash set somehow?
     let vocab = stmt
-        .query_map(NO_PARAMS, |row| {
+        .query_map([], |row| {
             Ok(Vocab {
                 word: row.get(0)?,
                 status: VocabStatus::from_i64(row.get(1)?).unwrap(),
@@ -133,7 +133,7 @@ pub fn select_by_status(conn: &Connection, status: VocabStatus) -> Result<HashSe
         status.to_i64()
     ))?;
     let known_words = stmt
-        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))?
+        .query_map([], |row| row.get(0))?
         .collect::<Result<HashSet<String>, _>>()?;
     Ok(known_words)
 }
@@ -144,7 +144,7 @@ pub fn select_known(conn: &Connection) -> Result<HashSet<String>> {
         STATUS_SUSPENDED_UNKNOWN
     ))?;
     let known_words = stmt
-        .query_map(NO_PARAMS, |row| Ok(row.get(0)?))?
+        .query_map([], |row| row.get(0))?
         .collect::<Result<HashSet<String>, _>>()?;
     Ok(known_words)
 }

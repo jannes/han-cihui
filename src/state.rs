@@ -101,15 +101,11 @@ pub struct DisplayState {
 impl DisplayState {
     // new - prev
     pub fn get_diff_active_words_chars(&self) -> Option<(i64, i64)> {
-        if let Some(prev_vocab_info) = &self.previous_vocab_info {
-            Some((
+        self.previous_vocab_info.as_ref().map(|prev_vocab_info| (
                 self.vocab_info.words_active as i64 - prev_vocab_info.words_active as i64,
                 self.vocab_info.chars_active_or_suspended_known as i64
                     - prev_vocab_info.chars_active_or_suspended_known as i64,
             ))
-        } else {
-            None
-        }
     }
 }
 
