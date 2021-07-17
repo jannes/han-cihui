@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ebook::{Book, Chapter};
+use crate::ebook::{FlatBook, FlatChapter};
 use crate::segmentation::{segment_book, SegmentationMode};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
@@ -16,7 +16,7 @@ pub struct ExtractionResult {
     pub(crate) vocabulary_info: HashSet<ExtractionItem>,
 }
 
-pub fn extract_vocab(book: &Book, segmentation_mode: SegmentationMode) -> ExtractionResult {
+pub fn extract_vocab(book: &FlatBook, segmentation_mode: SegmentationMode) -> ExtractionResult {
     let word_occur_freq = extract(book, segmentation_mode);
     let mut vocabulary_info: HashSet<ExtractionItem> = HashSet::new();
     let mut char_freq_map: HashMap<String, u64> = HashMap::new();
@@ -41,9 +41,7 @@ pub fn extract_vocab(book: &Book, segmentation_mode: SegmentationMode) -> Extrac
         }
     }
 
-    ExtractionResult {
-        vocabulary_info,
-    }
+    ExtractionResult { vocabulary_info }
 }
 
 pub fn contains_hanzi(word: &str) -> bool {
@@ -59,9 +57,9 @@ pub fn word_to_hanzi(word: &str) -> Vec<&str> {
 
 fn update_word_info<'a, 'b>(
     words: Vec<&'a str>,
-    current_chapter: &'b Chapter,
+    current_chapter: &'b FlatChapter,
     word_frequencies: &mut HashMap<&'a str, u64>,
-    word_occurrences: &mut HashMap<&'a str, &'b Chapter>,
+    word_occurrences: &mut HashMap<&'a str, &'b FlatChapter>,
 ) {
     for word in words {
         let mut frequency = 1;
@@ -74,14 +72,17 @@ fn update_word_info<'a, 'b>(
     }
 }
 
-fn extract(book: &Book, segmentation_mode: SegmentationMode) -> HashMap<String, (&Chapter, u64)> {
+fn extract(
+    book: &FlatBook,
+    segmentation_mode: SegmentationMode,
+) -> HashMap<String, (&FlatChapter, u64)> {
     if book.chapters.is_empty() {
         panic!("expected book with at least one chapter!");
     }
     let parsed = segment_book(&book, segmentation_mode);
 
     let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
-    let mut word_occurrences: HashMap<&str, &Chapter> = HashMap::new();
+    let mut word_occurrences: HashMap<&str, &FlatChapter> = HashMap::new();
     for (i, chapter) in book.chapters.iter().enumerate() {
         if i == 0 {
             update_word_info(

@@ -1,4 +1,4 @@
-use crate::ebook::Book;
+use crate::ebook::FlatBook;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
@@ -24,7 +24,7 @@ pub enum SegmentationMode {
     DictionaryOnly,
 }
 
-pub fn segment_book(book: &Book, segmentation_mode: SegmentationMode) -> BookSegmentation {
+pub fn segment_book(book: &FlatBook, segmentation_mode: SegmentationMode) -> BookSegmentation {
     let dir = tempdir().expect("expect successful creation of tempdir");
     let file_path = dir.path().join("tmp-book.json");
     let mut file = File::create(&file_path).expect("expect successful creation of tempfile");
