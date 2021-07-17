@@ -13,7 +13,7 @@ use rusqlite::Connection;
 
 use crate::{
     analysis::{get_analysis_info, AnalysisInfo, AnalysisQuery},
-    ebook::{open_as_book, Book},
+    ebook::{open_as_flat_book, FlatBook},
     extraction::{extract_vocab, ExtractionResult},
     persistence::{select_known, sync_anki_data},
     segmentation::SegmentationMode,
@@ -101,11 +101,13 @@ pub struct DisplayState {
 impl DisplayState {
     // new - prev
     pub fn get_diff_active_words_chars(&self) -> Option<(i64, i64)> {
-        self.previous_vocab_info.as_ref().map(|prev_vocab_info| (
+        self.previous_vocab_info.as_ref().map(|prev_vocab_info| {
+            (
                 self.vocab_info.words_active as i64 - prev_vocab_info.words_active as i64,
                 self.vocab_info.chars_active_or_suspended_known as i64
                     - prev_vocab_info.chars_active_or_suspended_known as i64,
-            ))
+            )
+        })
     }
 }
 
@@ -186,7 +188,7 @@ fn extract(
     let known_words: HashSet<String> = select_known(&db_connection.lock().unwrap())?
         .into_iter()
         .collect();
-    let book = open_as_book(filename)?;
+    let book = open_as_flat_book(filename, 1)?;
     let ext_res = extract_vocab(&book, seg_mode);
     Ok(ExtractedState::new(book, ext_res, known_words, true))
 }
@@ -231,7 +233,7 @@ impl ExtractingState {
 }
 
 pub struct ExtractedState {
-    pub book: Book,
+    pub book: FlatBook,
     pub extraction_result: ExtractionResult,
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
@@ -247,7 +249,7 @@ pub struct ExtractedSavingState {
 
 impl ExtractedState {
     pub fn new(
-        book: Book,
+        book: FlatBook,
         extraction_result: ExtractionResult,
         known_words: HashSet<String>,
         known_chars_are_known_words: bool,

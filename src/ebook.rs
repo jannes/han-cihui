@@ -1,50 +1,48 @@
-use anyhow::{anyhow, Context, Result};
-use epub::doc::{EpubDoc, NavPoint};
-use scraper::Html;
+use anyhow::Result;
+use epubparse::epub_to_book;
+use epubparse::types::Book;
+use epubparse::types::Chapter;
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::fs;
 
 #[derive(Serialize, Deserialize)]
-pub struct Chapter {
-    pub(crate) title: String,
-    pub(crate) content: String,
-    pub(crate) index: u32,
+pub struct FlatBook {
+    pub title: String,
+    pub author: String,
+    pub preface_content: String,
+    pub chapters: Vec<FlatChapter>,
 }
 
-impl Chapter {
-    pub fn get_numbered_title(&self) -> String {
-        format!("{:04}-{}", self.index, self.title)
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Book {
-    pub(crate) title: String,
-    pub(crate) author: String,
-    pub(crate) chapters: Vec<Chapter>,
-}
-
-impl Book {
+impl FlatBook {
     pub fn as_json(&self) -> String {
         serde_json::to_string(self).unwrap()
     }
 }
 
-pub struct FlattenedBook {
-    pub title: String,
-    pub author: Option<String>,
-    pub chapters: Vec<FlatChapter>,
-}
-
+#[derive(Serialize, Deserialize)]
 pub struct FlatChapter {
     pub title: String,
-    pub text: String,
+    pub content: String,
+    pub index: usize,
 }
 
-pub fn flatten_chapter(chapter: &epubparse::types::Chapter) -> FlatChapter {
+impl FlatChapter {
+    pub fn get_numbered_title(&self) -> String {
+        format!("{:04}-{}", self.index, self.title)
+    }
+}
+
+pub fn open_as_flat_book(filename: &str, depth: u32) -> Result<FlatBook> {
+    let book = open_epub_as_book(filename)?;
+    Ok(flatten_book(&book, depth))
+}
+
+fn open_epub_as_book(filename: &str) -> Result<Book> {
+    let bytes = fs::read(filename)?;
+    Ok(epub_to_book(&bytes)?)
+}
+
+fn flatten_chapter(chapter: &Chapter) -> Chapter {
     let title = chapter.title.to_string();
     let mut text = vec![chapter.text.to_string()];
     for subchapter in &chapter.subchapters {
@@ -52,22 +50,24 @@ pub fn flatten_chapter(chapter: &epubparse::types::Chapter) -> FlatChapter {
         text.push(flattened.title);
         text.push(flattened.text);
     }
-    FlatChapter {
+    Chapter {
         title,
         text: text.join("\n"),
+        subchapters: vec![],
     }
 }
 
-pub fn flatten_book(book: epubparse::types::Book, depth: u32) -> FlattenedBook {
-    fn flatten_subchapters(chapter: &epubparse::types::Chapter, depth: u32) -> Vec<FlatChapter> {
+fn flatten_book(book: &Book, depth: u32) -> FlatBook {
+    fn flatten_subchapters(chapter: &Chapter, depth: u32) -> Vec<Chapter> {
         if depth == 1 {
             vec![flatten_chapter(chapter)]
         } else {
-            let flattened = FlatChapter {
+            let flattened = Chapter {
                 title: chapter.title.to_string(),
                 text: chapter.text.to_string(),
+                subchapters: vec![],
             };
-            let flat_subchapters: Vec<FlatChapter> = chapter
+            let flat_subchapters: Vec<Chapter> = chapter
                 .subchapters
                 .iter()
                 .flat_map(|ch| flatten_subchapters(ch, depth - 1))
@@ -78,176 +78,84 @@ pub fn flatten_book(book: epubparse::types::Book, depth: u32) -> FlattenedBook {
         }
     }
 
-    let flat_chapters = book
+    let flat_chapters: Vec<FlatChapter> = book
         .chapters
         .iter()
         .flat_map(|chapter| flatten_subchapters(chapter, depth))
+        .enumerate()
+        .map(|(i, chapter)| FlatChapter {
+            title: chapter.title,
+            content: chapter.text,
+            index: i,
+        })
         .collect();
 
-    FlattenedBook {
-        title: book.title,
-        author: book.author,
+    FlatBook {
+        title: book.title.clone(),
+        author: book.author.clone().unwrap_or_else(|| "".to_string()),
+        preface_content: book.preface_content.clone(),
         chapters: flat_chapters,
     }
 }
 
-pub fn open_epub_as_book(filename: &str) -> Result<epubparse::types::Book> {
-    let bytes = fs::read(filename)?;
-    Ok(epubparse::epub_to_book(&bytes)?)
-}
-
-pub fn open_as_book(filename: &str) -> Result<Book> {
-    let edoc = EpubDoc::new(filename).map_err(|e| {
-        anyhow!(
-            "failed to create EpubDoc for {}, full error: {}",
-            filename,
-            e
-        )
-    })?;
-
-    get_book_from_edoc(edoc)
-}
-
-fn get_matching_navpoint(edoc: &EpubDoc, resource_path: &Path) -> Option<NavPoint> {
-    let matches: Vec<&NavPoint> = edoc
-        .toc
-        .iter()
-        .filter(|navp| {
-            navp.content
-                .to_str()
-                .unwrap()
-                .contains(resource_path.to_str().unwrap())
-        })
-        .collect();
-    // if there are are multiple matches they are most likely chapter and subchapter
-    // choose the last match, which should be the subchapter,
-    // as the chapter is just a container for the subchapters (usually)
-    matches.last().map(|navp| NavPoint {
-        label: navp.label.to_owned(),
-        content: navp.content.to_owned(),
-        play_order: navp.play_order,
-    })
-}
-
-// TODO: make this work
-fn clean_html_entities(text: &str) -> String {
-    text.replace("\u{00A0}", "J")
-}
-
-fn html_to_text(html: &str) -> String {
-    let fragment = Html::parse_fragment(html);
-    let mut result = String::new();
-    for node in fragment.tree {
-        if let scraper::Node::Text(text) = node {
-            result.push_str(text.text.as_ref())
-        }
-    }
-    result
-        .lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
-        .map(|line| line.to_string() + "\n")
-        .collect()
-}
-
-fn get_book_from_edoc(mut edoc: EpubDoc) -> Result<Book> {
-    let title = edoc
-        .mdata("title")
-        .context("malformatted epub, did not contain title metadata")?;
-    let author = edoc.mdata("creator");
-    let mut chapters: Vec<Chapter> = Vec::new();
-    let mut current_resource = edoc.get_current_id();
-    let current_chapter = NavPoint {
-        label: "".to_string(),
-        content: PathBuf::new(),
-        play_order: 0,
-    };
-    let mut current_chapter_content = String::new();
-    let mut index: u32 = 0;
-    while current_resource.is_ok() {
-        let current_resource_path: PathBuf = edoc
-            .resources
-            .get(current_resource.as_ref().unwrap())
-            .unwrap()
-            .0
-            .clone();
-        let current_resource_content = edoc
-            .get_resource_str_by_path(&current_resource_path)
-            .expect("invalid path to resource");
-
-        // find chapter that matches current resource
-        let chapter_match = get_matching_navpoint(&edoc, &current_resource_path);
-        // if any chapter matches current resource update current chapter,
-        // else current resource is still in old chapter
-        if let Some(current_chapter) = chapter_match {
-            chapters.push(Chapter {
-                title: current_chapter.label,
-                content: html_to_text(&current_chapter_content),
-                index,
-            });
-            current_chapter_content = String::new();
-            index += 1;
-        }
-        current_chapter_content.push_str(current_resource_content.as_str());
-
-        if edoc.go_next().is_err() {
-            break;
-        }
-        current_resource = edoc.get_current_id();
-    }
-    chapters.push(Chapter {
-        title: clean_html_entities(&current_chapter.label),
-        content: html_to_text(&current_chapter_content),
-        index,
-    });
-
-    Ok(Book {
-        title: clean_html_entities(&title),
-        author: author.unwrap_or_else(|| "unknown".to_string()),
-        chapters,
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::ebook::{open_as_book, Book, Chapter};
+    use crate::ebook::*;
+    use epubparse::types::Book;
+    use epubparse::types::Chapter;
 
-    #[test]
-    fn parse_epub() {
-        let book = open_as_book("test_resources/xusanguan.epub").unwrap();
-        assert_eq!(book.author, "余华");
-        assert_eq!(book.title, "许三观卖血记 (余华作品)");
-        assert_eq!(book.chapters.len(), 36);
-        assert_eq!(book.chapters.get(6).unwrap().title, "第一章");
-        assert!(book
-            .chapters
-            .get(6)
-            .unwrap()
-            .content
-            .contains("许三观是城里丝厂的送茧工，这一天他回到村里来看望他的爷爷。"));
-        assert_eq!(book.chapters.get(34).unwrap().title, "第二十九章");
+    fn get_example_book() -> Book {
+        Book {
+            title: "example title".to_string(),
+            author: Some("example author".to_string()),
+            preface_content: "example preface".to_string(),
+            chapters: vec![
+                Chapter {
+                    title: "Ch1".to_string(),
+                    text: "1 text".to_string(),
+                    subchapters: vec![Chapter {
+                        title: "Ch1.1".to_string(),
+                        text: "1.1 text".to_string(),
+                        subchapters: vec![Chapter {
+                            title: "Ch1.1.1".to_string(),
+                            text: "1.1.1 text".to_string(),
+                            subchapters: vec![],
+                        }],
+                    }],
+                },
+                Chapter {
+                    title: "Ch2".to_string(),
+                    text: "2 text".to_string(),
+                    subchapters: vec![],
+                },
+            ],
+        }
     }
 
     #[test]
-    fn parse_epub2() {
-        let book = open_as_book("test_resources/wangxiaobo-essays.epub").unwrap();
-        assert_eq!(book.author, "王小波");
-        assert_eq!(book.title, "王小波杂文集");
-        assert_eq!(book.chapters.len(), 38);
-        assert_eq!(book.chapters.get(4).unwrap().title, "花刺子模信使问题");
+    fn flatten_book_depth_1() {
+        let book = get_example_book();
+        let flattened = flatten_book(&book, 1);
+        assert_eq!(flattened.chapters.len(), 2);
+        let chapter1 = flattened.chapters.get(0).unwrap();
+        let chapter2 = flattened.chapters.get(1).unwrap();
+        assert!(chapter1.content.contains("1.1 text"));
+        assert!(chapter1.content.ends_with("1.1.1 text"));
+        assert!(chapter2.content.ends_with("2 text"));
     }
 
     #[test]
     fn book_to_json() {
-        let chapter = Chapter {
+        let chapter = FlatChapter {
             title: "一".to_string(),
             content: "这是第一章".to_string(),
             index: 1,
         };
 
-        let book = Book {
+        let book = FlatBook {
             title: "欢乐英雄".to_string(),
-            author: "古龙".to_string(),
+            author: Some("古龙".to_string()),
+            preface_content: "".to_string(),
             chapters: vec![chapter],
         };
 

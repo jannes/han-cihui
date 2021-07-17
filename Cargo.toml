@@ -1,22 +1,20 @@
 [package]
-name = "han-cihui"
-version = "0.1.0"
 authors = ["jannes <jannes.dev@posteo.net>"]
 edition = "2018"
+name = "han-cihui"
+version = "0.1.0"
 
 [dependencies]
-rusqlite = "0.25.3"
-serde_json = "1.0.53"
-clap = "2.33.1"
-epub = { git = "https://github.com/jannes/epub-rs", branch = "v1.2.1-allow_missing_play_order" }
-scraper = "0.12.0"
-regex = "1.3.9"
-lazy_static = "1.4.0"
-unicode-segmentation = "1.6.0"
-tempfile = "3.1.0"
-serde = { version = "1.0", features = ["derive"] }
 anyhow = "1.0.32"
-tui = {version = "0.15.0", default-features = false, features = ['crossterm', 'serde'] }
-crossterm = { version = "0.20", features = [ "serde" ] }
-unicode-width = "0.1.8"
+clap = "2.33.1"
+crossterm = {version = "0.20", features = ["serde"]}
 epubparse = "0.2.1"
+lazy_static = "1.4.0"
+regex = "1.3.9"
+rusqlite = "0.25.3"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0.53"
+tempfile = "3.1.0"
+tui = {version = "0.15.0", default-features = false, features = ['crossterm', 'serde']}
+unicode-segmentation = "1.6.0"
+unicode-width = "0.1.8"

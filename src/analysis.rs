@@ -1,4 +1,4 @@
-use crate::ebook::Book;
+use crate::ebook::FlatBook;
 use crate::{
     extraction::{word_to_hanzi, ExtractionItem, ExtractionResult},
     vocabulary::get_known_chars,
@@ -125,7 +125,7 @@ pub fn get_analysis_info(
 }
 
 pub fn save_filtered_extraction_info(
-    book: &Book,
+    book: &FlatBook,
     unknown_words_to_save: &HashSet<&ExtractionItem>,
     outpath: &str,
 ) -> Result<()> {
