@@ -154,7 +154,7 @@ mod tests {
 
         let book = FlatBook {
             title: "欢乐英雄".to_string(),
-            author: Some("古龙".to_string()),
+            author: "古龙".to_string(),
             preface_content: "".to_string(),
             chapters: vec![chapter],
         };
