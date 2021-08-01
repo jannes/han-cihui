@@ -9,7 +9,7 @@ Requires my [han-segmenter](https://github.com/jannes/han-segmenter) CLI tool fo
 - Export known words
 
 ## Ebook analysis
-- Analyze vocabulary in epub ebook 
+- Analyze vocabulary in epub ebook (using my [epubparse](https://github.com/jannes/epubparse) library for parsing)
 - Show amount of words/characters known and unknown
 - Supports filtering by word's and character's amount of occurrence within text  
   (only show words that occur at least x times or/and words that contain  
