@@ -8,7 +8,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use crate::tui::TuiApp;
-use cli_commands::{perform_add_external, print_anki_stats, show};
+use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
 use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
 
@@ -57,6 +57,11 @@ fn main() -> Result<()> {
             let matches = matches.subcommand_matches("add").unwrap();
             let filename = matches.value_of("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Known)
+        }
+        Some("delete") => {
+            let matches = matches.subcommand_matches("delete").unwrap();
+            let filename = matches.value_of("filename").unwrap();
+            perform_delete_external(&data_conn, filename)
         }
         Some("add-ignore") => {
             let matches = matches.subcommand_matches("add-ignore").unwrap();

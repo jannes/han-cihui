@@ -18,6 +18,7 @@ const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status int
                                added_chars integer not null
                             );";
 const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status) VALUES (?1, ?2)";
+const DELETE_WORD_QUERY: &str = "DELETE FROM words WHERE word = ?1";
 const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status) VALUES (?1, ?2)";
 // const INSERT_EVENT_QUERY: &str =
 //     "INSERT INTO add_events (date, kind, added_words, added_chars) VALUES (?1, ?2, ?3, ?4)";
@@ -104,6 +105,13 @@ pub fn add_external_words(
                 )?;
             }
         }
+    }
+    Ok(())
+}
+
+pub fn delete_words(conn: &Connection, words: &HashSet<String>) -> Result<()> {
+    for word in words {
+        conn.execute(DELETE_WORD_QUERY, params![word])?;
     }
     Ok(())
 }

@@ -13,6 +13,15 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                 ),
         )
         .subcommand(
+            SubCommand::with_name("delete")
+                .about("Deletes known vocabulary from file")
+                .arg(
+                    Arg::with_name("filename")
+                        .required(true)
+                        .help("path to file with one word per line"),
+                ),
+        )
+        .subcommand(
             SubCommand::with_name("add-ignore")
                 .about("Adds vocabulary to be ignored from file")
                 .arg(

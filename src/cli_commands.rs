@@ -11,7 +11,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use crate::{
     anki_access::{self, NoteStatus, ZhNote},
     persistence::{
-        add_external_words, select_all, select_by_status, select_known, AddedExternal, VocabStatus,
+        add_external_words, delete_words, select_all, select_by_status, select_known,
+        AddedExternal, VocabStatus,
     },
     NOTE_FIELD_PAIRS, WORD_DELIMITERS,
 };
@@ -124,6 +125,17 @@ pub fn perform_add_external(
     println!("amount to add: {}", &words_to_add.len());
     println!("amount new: {}", &words_unknown.len());
     add_external_words(&data_conn, words_unknown, kind)
+}
+
+pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result<()> {
+    let file_str = fs::read_to_string(filename)?;
+    let words_to_delete: HashSet<String> = file_str
+        .split('\n')
+        .map(|line| String::from(line.trim()))
+        .filter(|trimmed| !trimmed.is_empty())
+        .collect();
+    println!("amount to delete: {}", &words_to_delete.len());
+    delete_words(&data_conn, &words_to_delete)
 }
 
 pub fn zh_field_to_words(field: &str) -> Vec<String> {
