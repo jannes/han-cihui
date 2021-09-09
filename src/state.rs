@@ -254,6 +254,16 @@ impl ExtractedState {
         known_words: HashSet<String>,
         known_chars_are_known_words: bool,
     ) -> Self {
+        let known_words_chars = known_words
+            .union(&get_known_chars(&known_words))
+            .map(|s| s.to_string())
+            .collect::<HashSet<String>>();
+        let known = if known_chars_are_known_words {
+            &known_words_chars
+        } else {
+            &known_words
+        };
+
         let query_all = AnalysisQuery {
             min_occurrence_words: 1,
             min_occurrence_unknown_chars: None,
@@ -262,25 +272,23 @@ impl ExtractedState {
             min_occurrence_words: 3,
             min_occurrence_unknown_chars: None,
         };
+
         let mut analysis_infos = HashMap::new();
         let info_all = get_analysis_info(
             &extraction_result,
             query_all.min_occurrence_words,
-            &known_words,
+            known,
             query_all.min_occurrence_unknown_chars,
         );
         let info_min3 = get_analysis_info(
             &extraction_result,
             query_min3.min_occurrence_words,
-            &known_words,
+            known,
             query_min3.min_occurrence_unknown_chars,
         );
         analysis_infos.insert(query_all, info_all);
         analysis_infos.insert(query_min3, info_min3);
-        let known_words_chars = known_words
-            .union(&get_known_chars(&known_words))
-            .map(|s| s.to_string())
-            .collect::<HashSet<String>>();
+
         ExtractedState {
             book,
             extraction_result,
@@ -313,10 +321,15 @@ impl ExtractedState {
         if let Some(info) = self.analysis_infos.get(&query) {
             *info
         } else {
+            let known_words = if self.known_chars_are_known_words {
+                &self.known_words_chars
+            } else {
+                &self.known_words
+            };
             get_analysis_info(
                 &self.extraction_result,
                 query.min_occurrence_words,
-                &self.known_words,
+                known_words,
                 query.min_occurrence_unknown_chars,
             )
         }
