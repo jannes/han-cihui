@@ -79,7 +79,7 @@ fn extract(
     if book.chapters.is_empty() {
         panic!("expected book with at least one chapter!");
     }
-    let parsed = segment_book(&book, segmentation_mode);
+    let parsed = segment_book(book, segmentation_mode);
 
     let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
     let mut word_occurrences: HashMap<&str, &FlatChapter> = HashMap::new();

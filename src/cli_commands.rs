@@ -28,14 +28,14 @@ pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
             _ => panic!("unknown value for vocabulary status"),
         }
     } else {
-        select_known(&conn)
+        select_known(conn)
     }?;
     let target_items = if matches.is_present("kind") {
         let kind = matches.value_of("kind").unwrap();
         match kind {
             "words" => target_words,
             "chars" => {
-                let vocabs = select_all(&conn)?;
+                let vocabs = select_all(conn)?;
                 let mut active_or_known: HashSet<String> = HashSet::new();
                 let mut active_or_known_characters: HashSet<&str> = HashSet::new();
                 let mut target_characters: HashSet<String> = HashSet::new();
@@ -82,7 +82,7 @@ pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
 
 pub fn print_anki_stats(conn: &Connection) -> Result<()> {
     let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
-    let zh_notes = anki_access::get_zh_notes(&conn, &note_field_map)?;
+    let zh_notes = anki_access::get_zh_notes(conn, &note_field_map)?;
 
     let active_words = notes_to_words_filtered(&zh_notes, NoteStatus::Active);
     let inactive_unknown_words = notes_to_words_filtered(&zh_notes, NoteStatus::SuspendedUnknown);
@@ -124,7 +124,7 @@ pub fn perform_add_external(
     println!("amount saved: {}", &words_known.len());
     println!("amount to add: {}", &words_to_add.len());
     println!("amount new: {}", &words_unknown.len());
-    add_external_words(&data_conn, words_unknown, kind)
+    add_external_words(data_conn, words_unknown, kind)
 }
 
 pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result<()> {
@@ -135,7 +135,7 @@ pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result
         .filter(|trimmed| !trimmed.is_empty())
         .collect();
     println!("amount to delete: {}", &words_to_delete.len());
-    delete_words(&data_conn, &words_to_delete)
+    delete_words(data_conn, &words_to_delete)
 }
 
 pub fn zh_field_to_words(field: &str) -> Vec<String> {

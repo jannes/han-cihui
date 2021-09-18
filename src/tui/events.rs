@@ -143,6 +143,7 @@ fn handle_event_analysis_extracted(
 ) -> AnalysisState {
     let mut analysis_query = extracted_state.analysis_query;
     match key_event.code {
+        KeyCode::Char('r') => return AnalysisState::Blank,
         KeyCode::Char('s') => {
             return AnalysisState::ExtractedSaving(ExtractedSavingState {
                 extracted_state,

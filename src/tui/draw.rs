@@ -1,10 +1,11 @@
-use super::{
-    get_analysis_info_percentage_table, get_analysis_info_table, get_centered_rect, split_to_lines,
-};
 use crate::{
     state::{
         AnalysisState, ExtractedSavingState, ExtractedState, ExtractingState, InfoState, State,
         SyncingState, View,
+    },
+    tui::util::{
+        get_analysis_info_percentage_table, get_analysis_info_table, get_centered_rect,
+        get_wrapping_spans, split_to_lines,
     },
     vocabulary::VocabularyInfo,
 };
@@ -55,10 +56,10 @@ pub(super) fn draw_tab(
                     .as_ref(),
                 )
                 .split(main_chunk);
-            draw_header(rect, &state, vertical_chunks[0]);
-            draw_inner(rect, &state, vertical_chunks[1]);
-            draw_footer(rect, &state, vertical_chunks[2]);
-            draw_action_log(rect, &state, action_log_chunk);
+            draw_header(rect, state, vertical_chunks[0]);
+            draw_inner(rect, state, vertical_chunks[1]);
+            draw_footer(rect, state, vertical_chunks[2]);
+            draw_action_log(rect, state, action_log_chunk);
         })
         .context("error when drawing terminal")?;
     Ok(())
@@ -255,14 +256,19 @@ fn draw_analysis_opening(
 
 fn draw_analysis_blank(frame: &mut Frame<CrosstermBackend<impl Write>>, area: Rect) {
     let area = get_centered_rect(area);
-    let msg = Spans::from("press [E] to enter path of epub to extract vocab from");
+    let inner_width = (area.width - 2) as usize;
+    let msg = "press [E] to enter path of epub to extract vocab from";
+    let msg = split_to_lines(msg, inner_width, None)
+        .into_iter()
+        .map(|line| Spans::from(vec![Span::raw(line)]))
+        .collect::<Vec<_>>();
 
-    let input_panel = Paragraph::new(msg)
+    let msg_panel = Paragraph::new(msg)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left);
 
-    frame.render_widget(input_panel, area);
+    frame.render_widget(msg_panel, area);
 }
 
 fn draw_centered_input(
@@ -272,12 +278,7 @@ fn draw_centered_input(
     box_title: &str,
 ) {
     let area = get_centered_rect(area);
-    let inner_width = (area.width - 2) as usize;
-    let input = split_to_lines(partial_input, inner_width, None)
-        .into_iter()
-        .map(|line| Spans::from(vec![Span::raw(line)]))
-        .collect::<Vec<_>>();
-
+    let input = get_wrapping_spans(partial_input, &area, None);
     let input_panel = Paragraph::new(input)
         .block(Block::default().borders(Borders::ALL).title(Span::styled(
             box_title,
@@ -313,7 +314,7 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let text = match state.current_view {
         View::Analysis => {
-            "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save"
+            "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
         }
         View::Info => "[S]: sync Anki | [Q]: exit",
         View::Exit => "EXITING",
@@ -331,20 +332,16 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 }
 
 fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
-    let inner_width = (area.width - 2) as usize;
     let action_msgs = state
         .action_log
         .iter()
         // latest msgs should be on top
         .rev()
         // split msgs into lines that fit in container
-        .flat_map(|msg| split_to_lines(msg, inner_width, Some("+ ")))
-        .map(|line| Spans::from(vec![Span::raw(line)]))
+        .flat_map(|msg| get_wrapping_spans(msg, &area, Some("+ ")))
         .collect::<Vec<_>>();
-
     let action_log = Paragraph::new(action_msgs)
         .block(Block::default().borders(Borders::ALL).title("Action log"))
         .alignment(Alignment::Left);
-
     frame.render_widget(action_log, area)
 }

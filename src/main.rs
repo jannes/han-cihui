@@ -70,7 +70,7 @@ fn main() -> Result<()> {
         }
         Some("show") => {
             let matches = matches.subcommand_matches("show").unwrap();
-            show(&matches, &data_conn)
+            show(matches, &data_conn)
         }
         Some("anki-stats") => print_anki_stats(&data_conn),
         Some("analyze") => {
