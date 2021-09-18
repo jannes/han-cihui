@@ -8,6 +8,9 @@ use std::{
     convert::TryInto,
 };
 
+pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
+pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum NoteStatus {
     Active,
@@ -103,12 +106,12 @@ fn select_notes(
         }
         NoteStatus::SuspendedUnknown => {
             let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, crate::SUSPENDED_UNKNOWN_FLAG];
+            let params = params![note_type_id, SUSPENDED_UNKNOWN_FLAG];
             stmt_to_result(stmt, status, params)
         }
         NoteStatus::SuspendedKnown => {
             let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, crate::SUSPENDED_KNOWN_FLAG];
+            let params = params![note_type_id, SUSPENDED_KNOWN_FLAG];
             stmt_to_result(stmt, status, params)
         }
     }

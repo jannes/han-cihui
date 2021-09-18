@@ -3,9 +3,9 @@ extern crate clap;
 extern crate lazy_static;
 extern crate rusqlite;
 
-use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::{env, fs};
 
 use crate::tui::TuiApp;
 use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
@@ -13,7 +13,7 @@ use rusqlite::Connection;
 use state::{ExtractQuery, ExtractingState};
 
 use crate::cli_args::get_arg_matches;
-use crate::persistence::{create_table, AddedExternal};
+use crate::persistence::AddedExternal;
 use crate::segmentation::SegmentationMode;
 use crate::state::{AnalysisState, InfoState, State, View};
 use anyhow::Result;
@@ -32,26 +32,45 @@ mod vocabulary;
 
 pub const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
 pub const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
-pub const SUSPENDED_KNOWN_FLAG: i32 = 3;
-// green
-pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
-const DATA_DIR: &str = "/Users/jannes/.zhvocab";
-const DATA_PATH: &str = "/Users/jannes/.zhvocab/data.db";
+#[cfg(not(debug_assertions))]
+const DATA_DIR: &str = "/Users/jannes/.han-cihui";
 const ANKIDB_PATH: &str = "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
 
-fn main() -> Result<()> {
-    let matches = get_arg_matches();
+// making sure that when developing the path to the data directory has to be explicitely set
+#[cfg(debug_assertions)]
+fn get_data_dir() -> String {
+    env::var("DATA_DIR").expect("always pass DATA_DIR env var when developing")
+}
 
-    let data_conn: Connection;
-    // if first time call, do data setup
-    if !Path::new(DATA_PATH).exists() {
-        println!("performing first time setup");
-        data_conn = first_time_setup()?;
-    } else {
-        data_conn = Connection::open(DATA_PATH)?;
+#[cfg(not(debug_assertions))]
+fn get_data_dir() -> String {
+    match env::var("DATA_DIR") {
+        Ok(s) => s,
+        Err(_) => DATA_DIR.to_string(),
     }
+}
 
+mod embedded {
+    use refinery::embed_migrations;
+    embed_migrations!("migrations_sql");
+}
+
+fn main() -> Result<()> {
+    let data_dir = PathBuf::from(get_data_dir());
+    if !data_dir.exists() {
+        // if first time call, create data directory
+        println!(
+            "performing first time setup, creating {}",
+            data_dir.display()
+        );
+        fs::create_dir(&data_dir)?;
+    }
+    let db_path: PathBuf = [data_dir.as_path(), Path::new("data.db")].iter().collect();
+    let mut data_conn = Connection::open(db_path)?;
+    embedded::migrations::runner().run(&mut data_conn)?;
+
+    let matches = get_arg_matches();
     match matches.subcommand_name() {
         Some("add") => {
             let matches = matches.subcommand_matches("add").unwrap();
@@ -100,13 +119,4 @@ fn main() -> Result<()> {
         }
         _ => TuiApp::new_stdout(State::new(data_conn)?)?.run(),
     }
-}
-
-/// perform first time setup: create sqlite database and words table
-/// return database connection
-fn first_time_setup() -> Result<Connection> {
-    fs::create_dir(DATA_DIR)?;
-    let conn = Connection::open(DATA_PATH)?;
-    create_table(&conn)?;
-    Ok(conn)
 }

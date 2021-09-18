@@ -8,18 +8,18 @@ use crate::{
     ANKIDB_PATH, NOTE_FIELD_PAIRS,
 };
 
-const SETUP_QUERY: &str = "CREATE TABLE words (word text primary key, status integer not null);\
-                           CREATE INDEX word_index ON words(word);\
-                           CREATE TABLE add_events (
-                               id integer primary key autoincrement, 
-                               date text not null, 
-                               kind integer not null, 
-                               added_words integer not null, 
-                               added_chars integer not null
-                            );";
 const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status) VALUES (?1, ?2)";
 const DELETE_WORD_QUERY: &str = "DELETE FROM words WHERE word = ?1";
 const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status) VALUES (?1, ?2)";
+
+// const SETUP_EVENT_QUERY: &str = "
+//                            CREATE TABLE add_events (
+//                                id integer primary key autoincrement,
+//                                date text not null,
+//                                kind integer not null,
+//                                added_words integer not null,
+//                                added_chars integer not null
+//                             );";
 // const INSERT_EVENT_QUERY: &str =
 //     "INSERT INTO add_events (date, kind, added_words, added_chars) VALUES (?1, ?2, ?3, ?4)";
 
@@ -76,11 +76,6 @@ pub enum AddedExternal {
 pub struct Vocab {
     pub word: String,
     pub status: VocabStatus,
-}
-
-pub fn create_table(conn: &Connection) -> Result<()> {
-    conn.execute(SETUP_QUERY, [])?;
-    Ok(())
 }
 
 pub fn add_external_words(
