@@ -2,4 +2,5 @@ target/
 .idea/
 **/__pycache__
 tocs/
+test-data-dir/
 

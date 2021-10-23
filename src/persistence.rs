@@ -8,9 +8,11 @@ use crate::{
     ANKIDB_PATH, NOTE_FIELD_PAIRS,
 };
 
-const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status) VALUES (?1, ?2)";
+const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed) 
+                                 VALUES (?1, ?2, strftime('%s','now'))";
 const DELETE_WORD_QUERY: &str = "DELETE FROM words WHERE word = ?1";
-const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status) VALUES (?1, ?2)";
+const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status, last_changed) 
+                                    VALUES (?1, ?2, strftime('%s','now'))";
 
 // const SETUP_EVENT_QUERY: &str = "
 //                            CREATE TABLE add_events (
@@ -83,23 +85,12 @@ pub fn add_external_words(
     words: &HashSet<&str>,
     kind: AddedExternal,
 ) -> Result<()> {
-    match kind {
-        AddedExternal::Known => {
-            for word in words {
-                conn.execute(
-                    INSERT_WORD_QUERY,
-                    params![word, STATUS_ADDED_EXTERNAL_KNOWN],
-                )?;
-            }
-        }
-        AddedExternal::Ignored => {
-            for word in words {
-                conn.execute(
-                    INSERT_WORD_QUERY,
-                    params![word, STATUS_ADDED_EXTERNAL_IGNORED],
-                )?;
-            }
-        }
+    let status = match kind {
+        AddedExternal::Known => STATUS_ADDED_EXTERNAL_KNOWN,
+        AddedExternal::Ignored => STATUS_ADDED_EXTERNAL_IGNORED,
+    };
+    for word in words {
+        conn.execute(INSERT_WORD_QUERY, params![word, status])?;
     }
     Ok(())
 }
