@@ -2,10 +2,6 @@ mod analysis;
 mod info;
 mod word_list;
 
-use crate::state::AnalysisState;
-use crate::state::InfoState;
-use crate::state::State;
-use crate::state::View;
 use anyhow::Result;
 use crossterm::event;
 use crossterm::event::KeyCode;
@@ -16,6 +12,11 @@ use self::analysis::handle_event_analysis_extracted;
 use self::analysis::handle_event_analysis_opening;
 use self::analysis::handle_event_analysis_saving;
 use self::info::handle_event_info;
+
+use super::state::analysis::AnalysisState;
+use super::state::info::InfoState;
+use super::state::State;
+use super::state::View;
 
 pub enum Event<I> {
     Input(I),

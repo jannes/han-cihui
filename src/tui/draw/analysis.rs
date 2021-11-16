@@ -1,8 +1,8 @@
-use crate::state::{ExtractedSavingState, ExtractedState, ExtractingState};
 use crate::tui::draw::util::{
     draw_centered_input, get_analysis_info_percentage_table, get_analysis_info_table,
     get_centered_rect, split_to_lines,
 };
+use crate::tui::state::analysis::{ExtractedSavingState, ExtractedState, ExtractingState};
 use anyhow::Error;
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout};

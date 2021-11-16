@@ -3,7 +3,6 @@ mod info;
 mod util;
 mod word_list;
 
-use crate::state::{AnalysisState, InfoState, State, View};
 use anyhow::{Context, Result};
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Margin};
@@ -26,6 +25,10 @@ use self::{
     info::{draw_info, draw_info_syncing},
     util::get_wrapping_spans,
 };
+
+use super::state::analysis::AnalysisState;
+use super::state::info::InfoState;
+use super::state::{State, View};
 
 pub(super) fn draw_window(
     state: &State,

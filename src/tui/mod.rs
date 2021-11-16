@@ -1,7 +1,7 @@
 mod draw;
 mod events;
+pub mod state;
 
-use crate::state::{State, View};
 use anyhow::Result;
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use crossterm::ExecutableCommand;
@@ -12,6 +12,7 @@ use std::{io::Stdout, sync::mpsc};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
+use self::state::{State, View};
 use self::{
     draw::draw_window,
     events::{handle_event, Event},

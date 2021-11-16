@@ -7,15 +7,16 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{env, fs};
 
+use crate::tui::state::analysis::{AnalysisState, ExtractQuery, ExtractingState};
+use crate::tui::state::info::InfoState;
+use crate::tui::state::{State, View};
 use crate::tui::TuiApp;
 use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
 use rusqlite::Connection;
-use state::{ExtractQuery, ExtractingState};
 
 use crate::cli_args::get_arg_matches;
 use crate::persistence::AddedExternal;
 use crate::segmentation::SegmentationMode;
-use crate::state::{AnalysisState, InfoState, State, View};
 use anyhow::Result;
 
 mod analysis;
@@ -26,9 +27,9 @@ mod ebook;
 mod extraction;
 mod persistence;
 mod segmentation;
-mod state;
 mod tui;
 mod vocabulary;
+mod word_lists;
 
 pub const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
 pub const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];

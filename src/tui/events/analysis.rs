@@ -1,9 +1,10 @@
-use crate::state::AnalysisState;
 use crate::{
     analysis::{get_filtered_extraction_items, save_filtered_extraction_info},
     extraction::ExtractionItem,
     segmentation::SegmentationMode,
-    state::{ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState},
+    tui::state::analysis::{
+        AnalysisState, ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState,
+    },
 };
 use anyhow::Result;
 use crossterm::event;

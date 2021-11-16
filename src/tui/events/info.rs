@@ -1,8 +1,6 @@
-use crate::state::InfoState;
-use crate::{
-    state::{State, SyncingState},
-    vocabulary::VocabularyInfo,
-};
+use crate::tui::state::info::{InfoState, SyncingState};
+use crate::tui::state::State;
+use crate::vocabulary::VocabularyInfo;
 
 use crossterm::event;
 use crossterm::event::KeyCode;

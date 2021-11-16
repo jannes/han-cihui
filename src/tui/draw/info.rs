@@ -1,4 +1,5 @@
-use crate::{state::SyncingState, tui::draw::util::get_centered_rect, vocabulary::VocabularyInfo};
+use crate::tui::state::info::SyncingState;
+use crate::{tui::draw::util::get_centered_rect, vocabulary::VocabularyInfo};
 
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
