@@ -1,6 +1,5 @@
 mod draw;
 mod events;
-mod util;
 
 use crate::state::{State, View};
 use anyhow::Result;
@@ -14,7 +13,7 @@ use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
 use self::{
-    draw::draw_tab,
+    draw::draw_window,
     events::{handle_event, Event},
 };
 
@@ -64,7 +63,7 @@ impl TuiApp {
         // 1. draw ui 2. listen for events
         // stop when state changes to exiting
         loop {
-            draw_tab(self.state.as_ref().unwrap(), &mut self.terminal)?;
+            draw_window(self.state.as_ref().unwrap(), &mut self.terminal)?;
             let event = rx.recv()?;
             self.state = Some(handle_event(self.state.take().unwrap(), event)?);
             if let View::Exit = self.state.as_ref().unwrap().current_view {

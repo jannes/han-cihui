@@ -1,8 +1,12 @@
+use std::io::Write;
+
 use tui::{
-    layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    backend::CrosstermBackend,
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Row, Table},
+    widgets::{Block, Borders, Paragraph, Row, Table},
+    Frame,
 };
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
@@ -104,7 +108,24 @@ pub fn get_analysis_info_percentage_table<'a, 'b, 'c>(
         ])
 }
 
-// ------- UTIL FUNCTIONS - UI only ---------
+pub fn draw_centered_input(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    area: Rect,
+    partial_input: &str,
+    box_title: &str,
+) {
+    let area = get_centered_rect(area);
+    let input = get_wrapping_spans(partial_input, &area, None);
+    let input_panel = Paragraph::new(input)
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            box_title,
+            Style::default().add_modifier(Modifier::BOLD),
+        )))
+        .style(Style::default().fg(Color::White))
+        .alignment(Alignment::Left);
+
+    frame.render_widget(input_panel, area);
+}
 
 pub fn get_centered_rect(r: Rect) -> Rect {
     let percent_y = 50;

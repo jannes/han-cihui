@@ -1,22 +1,13 @@
-use crate::{
-    state::{
-        AnalysisState, ExtractedSavingState, ExtractedState, ExtractingState, InfoState, State,
-        SyncingState, View,
-    },
-    tui::util::{
-        get_analysis_info_percentage_table, get_analysis_info_table, get_centered_rect,
-        get_wrapping_spans, split_to_lines,
-    },
-    vocabulary::VocabularyInfo,
-};
-use anyhow::{Context, Error, Result};
+mod analysis;
+mod info;
+mod util;
+mod word_list;
+
+use crate::state::{AnalysisState, InfoState, State, View};
+use anyhow::{Context, Result};
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Margin};
-use tui::{
-    backend::CrosstermBackend,
-    layout::Rect,
-    widgets::{Clear, Wrap},
-};
+use tui::{backend::CrosstermBackend, layout::Rect};
 use tui::{style::Modifier, text::Spans, Terminal};
 use tui::{
     style::{Color, Style},
@@ -27,7 +18,16 @@ use tui::{
     widgets::{Block, BorderType, Borders, Paragraph, Tabs},
 };
 
-pub(super) fn draw_tab(
+use self::{
+    analysis::{
+        draw_analysis_blank, draw_analysis_extracted, draw_analysis_extracted_error,
+        draw_analysis_extracting, draw_analysis_opening, draw_analysis_saving,
+    },
+    info::{draw_info, draw_info_syncing},
+    util::get_wrapping_spans,
+};
+
+pub(super) fn draw_window(
     state: &State,
     terminal: &mut Terminal<CrosstermBackend<impl Write>>,
 ) -> Result<()> {
@@ -97,197 +97,6 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
         },
         View::Exit => {}
     }
-}
-
-fn draw_info(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    vocab_info: &VocabularyInfo,
-    area: Rect,
-) {
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(2)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref());
-    let chunks = layout.split(area);
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("My vocabulary");
-    let words_text = vocab_info
-        .words_description()
-        .into_iter()
-        .map(Spans::from)
-        .collect::<Vec<Spans>>();
-    let chars_text = vocab_info
-        .chars_description()
-        .into_iter()
-        .map(Spans::from)
-        .collect::<Vec<Spans>>();
-    let words_paragraph = Paragraph::new(words_text)
-        .block(Block::default().title("词").borders(Borders::ALL))
-        .alignment(Alignment::Right)
-        .wrap(Wrap { trim: true });
-    let chars_paragraph = Paragraph::new(chars_text)
-        .block(Block::default().title("字").borders(Borders::ALL))
-        .alignment(Alignment::Right)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(block, area);
-    frame.render_widget(words_paragraph, chunks[0]);
-    frame.render_widget(chars_paragraph, chunks[1]);
-}
-
-fn draw_info_syncing(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &SyncingState,
-    area: Rect,
-) {
-    let amount_dots = (state.elapsed().as_secs() % 10) as usize;
-    let text = format!("Syncing {}", ".".repeat(amount_dots));
-    let area = get_centered_rect(area);
-    let paragraph = Paragraph::new(text)
-        .block(
-            Block::default()
-                .title("Syncing vocabulary with Anki")
-                .borders(Borders::ALL),
-        )
-        .alignment(Alignment::Left)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(Clear, area); //this clears out the background
-    frame.render_widget(paragraph, area)
-}
-
-fn draw_analysis_extracted(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &ExtractedState,
-    area: Rect,
-) {
-    let info_all = state.query_all();
-    let info_min_occ = state.query_current();
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .margin(2)
-        .constraints(
-            [
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(34),
-            ]
-            .as_ref(),
-        );
-    let chunks = layout.split(area);
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .style(Style::default().fg(Color::White))
-        .title("词/字 occurrence info");
-    frame.render_widget(block, area);
-    let all_chunk = chunks[0];
-    let min_occ_chunk = chunks[1];
-    let perc_chunk = chunks[2];
-    frame.render_widget(
-        get_analysis_info_table(&info_all, "all words".to_string()),
-        all_chunk,
-    );
-    let min_occ_title = match state.analysis_query.min_occurrence_unknown_chars {
-        Some(amount) => format!(
-            "#word >= {} OR contains unknown #char >= {}",
-            state.analysis_query.min_occurrence_words, amount
-        ),
-        None => format!("#word >= {}", state.analysis_query.min_occurrence_words),
-    };
-    frame.render_widget(
-        get_analysis_info_table(&info_min_occ, min_occ_title),
-        min_occ_chunk,
-    );
-    frame.render_widget(
-        get_analysis_info_percentage_table(&info_all, &info_min_occ),
-        perc_chunk,
-    );
-}
-
-fn draw_analysis_extracting(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &ExtractingState,
-    area: Rect,
-) {
-    let amount_dots = (state.elapsed().as_secs() % 10) as usize;
-    let text = format!("Extracting {}", ".".repeat(amount_dots));
-    let area = get_centered_rect(area);
-    let paragraph = Paragraph::new(text)
-        .block(
-            Block::default()
-                .title("Extracting from epub")
-                .borders(Borders::ALL),
-        )
-        .alignment(Alignment::Left)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(Clear, area); //this clears out the background
-    frame.render_widget(paragraph, area);
-}
-
-fn draw_analysis_extracted_error(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    error: &Error,
-    area: Rect,
-) {
-    let msg = format!("{}\n\n\nPress [E] to open another file", error);
-    draw_centered_input(frame, area, &msg, "Error extracting");
-}
-
-fn draw_analysis_saving(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &ExtractedSavingState,
-    area: Rect,
-) {
-    draw_centered_input(
-        frame,
-        area,
-        &state.partial_save_path,
-        "Path to save json result file to",
-    )
-}
-
-fn draw_analysis_opening(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    partial_path: &str,
-    area: Rect,
-) {
-    draw_centered_input(frame, area, partial_path, "Path to epub file to open")
-}
-
-fn draw_analysis_blank(frame: &mut Frame<CrosstermBackend<impl Write>>, area: Rect) {
-    let area = get_centered_rect(area);
-    let inner_width = (area.width - 2) as usize;
-    let msg = "press [E] to enter path of epub to extract vocab from";
-    let msg = split_to_lines(msg, inner_width, None)
-        .into_iter()
-        .map(|line| Spans::from(vec![Span::raw(line)]))
-        .collect::<Vec<_>>();
-
-    let msg_panel = Paragraph::new(msg)
-        .block(Block::default().borders(Borders::ALL))
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Left);
-
-    frame.render_widget(msg_panel, area);
-}
-
-fn draw_centered_input(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    area: Rect,
-    partial_input: &str,
-    box_title: &str,
-) {
-    let area = get_centered_rect(area);
-    let input = get_wrapping_spans(partial_input, &area, None);
-    let input_panel = Paragraph::new(input)
-        .block(Block::default().borders(Borders::ALL).title(Span::styled(
-            box_title,
-            Style::default().add_modifier(Modifier::BOLD),
-        )))
-        .style(Style::default().fg(Color::White))
-        .alignment(Alignment::Left);
-
-    frame.render_widget(input_panel, area);
 }
 
 fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
