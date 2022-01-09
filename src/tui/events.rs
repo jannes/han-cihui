@@ -11,9 +11,12 @@ use self::analysis::handle_event_analysis_blank;
 use self::analysis::handle_event_analysis_extracted;
 use self::analysis::handle_event_analysis_opening;
 use self::info::handle_event_info;
+use self::word_list::handle_event_word_list_detail;
+use self::word_list::handle_event_word_lists;
 
 use super::state::analysis::AnalysisState;
 use super::state::info::InfoState;
+use super::state::word_list::WordListState;
 use super::state::State;
 use super::state::View;
 
@@ -38,6 +41,10 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     }
                     KeyCode::Char('1') => {
                         state.current_view = View::Analysis;
+                        return Ok(state);
+                    }
+                    KeyCode::Char('2') => {
+                        state.current_view = View::WordLists;
                         return Ok(state);
                     }
                     _ => {}
@@ -124,6 +131,16 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             if let Some(new_state) = new_state {
                 state.info_state = new_state;
             }
+        }
+        View::WordLists => {
+            let new_state = match &state.word_list_state {
+                WordListState::ListOfWordLists { word_lists } => {
+                    handle_event_word_lists(&state, key_event)
+                }
+                WordListState::OpenedWordList { word_list } => {
+                    handle_event_word_list_detail(&state, key_event)
+                }
+            };
         }
         View::Exit => {}
     };

@@ -14,10 +14,10 @@ use crate::{
 };
 
 // vocabulary
-const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed) 
+const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed)
                                  VALUES (?1, ?2, strftime('%s','now'))";
 const DELETE_WORD_QUERY: &str = "DELETE FROM words WHERE word = ?1";
-const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status, last_changed) 
+const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status, last_changed)
                                     VALUES (?1, ?2, strftime('%s','now'))";
 
 const STATUS_ACTIVE: i64 = 0;
@@ -28,12 +28,12 @@ const STATUS_ADDED_EXTERNAL_IGNORED: i64 = 4;
 
 // word lists
 const INSERT_WORD_LIST_QUERY: &str = "
-INSERT INTO word_lists 
+INSERT INTO word_lists
 (book_name, author_name, create_time, min_occurrence_words, min_occurrence_chars, word_list_json)
 VALUES (?1, ?2, strftime('%s', 'now'), ?3, ?4, ?5)";
 
 const SELECT_ALL_WORD_LISTS_QUERY: &str = "
-SELECT (id, book_name, author_name, create_time, min_occurrence_words, min_occurrence_chars)
+SELECT id, book_name, author_name, create_time, min_occurrence_words, min_occurrence_chars
 FROM word_lists";
 
 const SELECT_WORD_LIST_QUERY: &str = "

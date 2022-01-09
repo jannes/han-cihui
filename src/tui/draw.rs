@@ -17,6 +17,7 @@ use tui::{
     widgets::{Block, BorderType, Borders, Paragraph, Tabs},
 };
 
+use self::word_list::draw_word_lists;
 use self::{
     analysis::{
         draw_analysis_blank, draw_analysis_extracted, draw_analysis_extracted_error,
@@ -28,6 +29,7 @@ use self::{
 
 use super::state::analysis::AnalysisState;
 use super::state::info::InfoState;
+use super::state::word_list::WordListState;
 use super::state::{State, View};
 
 pub(super) fn draw_window(
@@ -95,18 +97,29 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
                 draw_info(frame, &sync_error_state.previous_vocab_info, area)
             }
         },
+        View::WordLists => match &state.word_list_state {
+            WordListState::ListOfWordLists { word_lists } => {
+                draw_word_lists(frame, area, word_lists)
+            }
+            WordListState::OpenedWordList { word_list } => todo!(),
+        },
         View::Exit => {}
     }
 }
 
 fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
-    let tab_titles = vec!["Info [0]".to_string(), "Analysis [1]".to_string()]
-        .into_iter()
-        .map(|s| Spans::from(Span::styled(s, Style::default().fg(Color::Yellow))))
-        .collect();
+    let tab_titles = vec![
+        "Vocabulary [0]".to_string(),
+        "Analysis [1]".to_string(),
+        "Word Lists [2]".to_string(),
+    ]
+    .into_iter()
+    .map(|s| Spans::from(Span::styled(s, Style::default().fg(Color::Yellow))))
+    .collect();
     let selected = match state.current_view {
-        View::Analysis => 1,
         View::Info => 0,
+        View::Analysis => 1,
+        View::WordLists => 2,
         View::Exit => 0,
     };
     let tabs = Tabs::new(tab_titles)
@@ -126,6 +139,7 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
             "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
         }
         View::Info => "[S]: sync Anki | [Q]: exit",
+        View::WordLists => "[ESC]: overview | [Enter]: select | [J]: down | [K]: up",
         View::Exit => "EXITING",
     };
     let paragraph = Paragraph::new(text)

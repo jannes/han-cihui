@@ -7,12 +7,12 @@ use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
-use self::{analysis::AnalysisState, info::InfoState};
+use self::{analysis::AnalysisState, info::InfoState, word_list::WordListState};
 
 pub struct State {
     pub analysis_state: AnalysisState,
     pub info_state: InfoState,
-    // pub word_list_state: WordListState,
+    pub word_list_state: WordListState,
     pub current_view: View,
     pub db_connection: Arc<Mutex<Connection>>,
     pub action_log: Vec<String>,
@@ -24,6 +24,7 @@ impl State {
         Ok(State {
             analysis_state: AnalysisState::default(),
             info_state: InfoState::init(db_connection.clone())?,
+            word_list_state: WordListState::init(db_connection.clone())?,
             current_view: View::Info,
             db_connection,
             action_log: vec![],
@@ -40,7 +41,8 @@ impl State {
 }
 
 pub enum View {
-    Analysis,
     Info,
+    Analysis,
+    WordLists,
     Exit,
 }

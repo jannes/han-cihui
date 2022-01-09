@@ -9,6 +9,7 @@ use std::{env, fs};
 
 use crate::tui::state::analysis::{AnalysisState, ExtractQuery, ExtractingState};
 use crate::tui::state::info::InfoState;
+use crate::tui::state::word_list::WordListState;
 use crate::tui::state::{State, View};
 use crate::tui::TuiApp;
 use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
@@ -113,8 +114,9 @@ fn main() -> Result<()> {
                 )),
                 info_state: InfoState::init(db.clone())?,
                 current_view: View::Analysis,
-                db_connection: db,
+                db_connection: db.clone(),
                 action_log: vec![],
+                word_list_state: WordListState::init(db)?,
             };
             TuiApp::new_stdout(state)?.run()
         }
