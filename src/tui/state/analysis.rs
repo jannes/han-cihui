@@ -25,7 +25,6 @@ pub enum AnalysisState {
     ExtractError(anyhow::Error),
     Extracting(ExtractingState),
     Extracted(ExtractedState),
-    ExtractedSaving(ExtractedSavingState),
 }
 
 impl Default for AnalysisState {
@@ -106,11 +105,6 @@ pub struct ExtractedState {
     pub known_chars_are_known_words: bool,
     known_words: HashSet<String>,
     known_words_chars: HashSet<String>,
-}
-
-pub struct ExtractedSavingState {
-    pub extracted_state: ExtractedState,
-    pub partial_save_path: String,
 }
 
 impl ExtractedState {

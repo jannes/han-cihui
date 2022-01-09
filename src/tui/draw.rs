@@ -20,7 +20,7 @@ use tui::{
 use self::{
     analysis::{
         draw_analysis_blank, draw_analysis_extracted, draw_analysis_extracted_error,
-        draw_analysis_extracting, draw_analysis_opening, draw_analysis_saving,
+        draw_analysis_extracting, draw_analysis_opening,
     },
     info::{draw_info, draw_info_syncing},
     util::get_wrapping_spans,
@@ -85,9 +85,6 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             }
             AnalysisState::Extracting(extracting_state) => {
                 draw_analysis_extracting(frame, extracting_state, area);
-            }
-            AnalysisState::ExtractedSaving(saving_state) => {
-                draw_analysis_saving(frame, saving_state, area);
             }
         },
         View::Info => match &state.info_state {

@@ -2,7 +2,7 @@ use crate::tui::draw::util::{
     draw_centered_input, get_analysis_info_percentage_table, get_analysis_info_table,
     get_centered_rect, split_to_lines,
 };
-use crate::tui::state::analysis::{ExtractedSavingState, ExtractedState, ExtractingState};
+use crate::tui::state::analysis::{ExtractedState, ExtractingState};
 use anyhow::Error;
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
@@ -96,19 +96,6 @@ pub fn draw_analysis_extracted_error(
 ) {
     let msg = format!("{}\n\n\nPress [E] to open another file", error);
     draw_centered_input(frame, area, &msg, "Error extracting");
-}
-
-pub fn draw_analysis_saving(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &ExtractedSavingState,
-    area: Rect,
-) {
-    draw_centered_input(
-        frame,
-        area,
-        &state.partial_save_path,
-        "Path to save json result file to",
-    )
 }
 
 pub fn draw_analysis_opening(

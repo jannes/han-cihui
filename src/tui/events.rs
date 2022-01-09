@@ -10,7 +10,6 @@ use event::KeyEvent;
 use self::analysis::handle_event_analysis_blank;
 use self::analysis::handle_event_analysis_extracted;
 use self::analysis::handle_event_analysis_opening;
-use self::analysis::handle_event_analysis_saving;
 use self::info::handle_event_info;
 
 use super::state::analysis::AnalysisState;
@@ -86,11 +85,11 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         View::Analysis => {
             state.analysis_state = match state.analysis_state {
                 AnalysisState::Extracted(extracted_state) => {
-                    handle_event_analysis_extracted(extracted_state, key_event)
-                }
-                AnalysisState::ExtractedSaving(extracted_saving_state) => {
-                    let (new_state, action) =
-                        handle_event_analysis_saving(extracted_saving_state, key_event)?;
+                    let (new_state, action) = handle_event_analysis_extracted(
+                        extracted_state,
+                        key_event,
+                        state.db_connection.clone(),
+                    )?;
                     update_action_log(&mut state.action_log, action);
                     new_state
                 }

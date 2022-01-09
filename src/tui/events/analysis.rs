@@ -1,12 +1,11 @@
 use crate::{
-    analysis::{get_filtered_extraction_items, save_filtered_extraction_info},
     extraction::ExtractionItem,
+    persistence::insert_word_list,
     segmentation::SegmentationMode,
-    tui::state::analysis::{
-        AnalysisState, ExtractQuery, ExtractedSavingState, ExtractedState, ExtractingState,
-    },
+    tui::state::analysis::{AnalysisState, ExtractQuery, ExtractedState, ExtractingState},
+    word_lists::construct_word_list,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use crossterm::event;
 use crossterm::event::KeyCode;
 use event::KeyEvent;
@@ -19,15 +18,24 @@ use std::{
 pub fn handle_event_analysis_extracted(
     mut extracted_state: ExtractedState,
     key_event: KeyEvent,
-) -> AnalysisState {
+    db: Arc<Mutex<Connection>>,
+) -> Result<(AnalysisState, Option<String>)> {
     let mut analysis_query = extracted_state.analysis_query;
+    let mut action_log_entry: Option<String> = None;
     match key_event.code {
-        KeyCode::Char('r') => return AnalysisState::Blank,
+        KeyCode::Char('r') => return Ok((AnalysisState::Blank, None)),
         KeyCode::Char('s') => {
-            return AnalysisState::ExtractedSaving(ExtractedSavingState {
-                extracted_state,
-                partial_save_path: String::new(),
-            })
+            let book = &extracted_state.book;
+            let analysis_query = extracted_state.analysis_query;
+            let unknown_words_to_save: HashSet<&ExtractionItem> = extracted_state
+                .extraction_result
+                .vocabulary_info
+                .iter()
+                .collect();
+            let word_list = construct_word_list(book, analysis_query, &unknown_words_to_save);
+            insert_word_list(&db.lock().unwrap(), word_list)
+                .context("unable to save word list to DB")?;
+            action_log_entry = Some(format!("Saved word list for {}", book.title));
         }
         // reduce min_occurrence of words
         KeyCode::Char('j') => {
@@ -65,49 +73,7 @@ pub fn handle_event_analysis_extracted(
         _ => {}
     }
     extracted_state.query_update(analysis_query);
-    AnalysisState::Extracted(extracted_state)
-}
-
-pub fn handle_event_analysis_saving(
-    mut saving_state: ExtractedSavingState,
-    key_event: KeyEvent,
-) -> Result<(AnalysisState, Option<String>)> {
-    match key_event.code {
-        KeyCode::Char(c) => {
-            saving_state.partial_save_path.push(c);
-        }
-        KeyCode::Backspace => {
-            saving_state.partial_save_path.pop();
-        }
-        KeyCode::Esc => {
-            return Ok((
-                AnalysisState::Extracted(saving_state.extracted_state),
-                Some("canceled save".to_string()),
-            ));
-        }
-        KeyCode::Enter => {
-            let extracted = &saving_state.extracted_state;
-            let book = &extracted.book;
-            let filtered_extraction_set = get_filtered_extraction_items(
-                &extracted.extraction_result,
-                extracted.analysis_query.min_occurrence_words,
-                extracted.get_known_words(),
-                extracted.analysis_query.min_occurrence_unknown_chars,
-            );
-            let known_words = saving_state.extracted_state.get_known_words();
-            let unknown_to_save: HashSet<&ExtractionItem> = filtered_extraction_set
-                .into_iter()
-                .filter(|item| !known_words.contains(&item.word))
-                .collect();
-            save_filtered_extraction_info(book, &unknown_to_save, &saving_state.partial_save_path)?;
-            return Ok((
-                AnalysisState::Extracted(saving_state.extracted_state),
-                Some(format!("saved to {}", &saving_state.partial_save_path)),
-            ));
-        }
-        _ => {}
-    }
-    Ok((AnalysisState::ExtractedSaving(saving_state), None))
+    Ok((AnalysisState::Extracted(extracted_state), action_log_entry))
 }
 
 pub fn handle_event_analysis_opening(

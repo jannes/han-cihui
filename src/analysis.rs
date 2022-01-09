@@ -1,14 +1,8 @@
-use crate::ebook::FlatBook;
 use crate::{
     extraction::{word_to_hanzi, ExtractionItem, ExtractionResult},
     vocabulary::get_known_chars,
 };
-use anyhow::{Context, Result};
-use serde_json::{json, to_writer_pretty, Value};
-use std::{
-    collections::{HashMap, HashSet},
-    fs::File,
-};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub struct AnalysisQuery {
@@ -122,47 +116,6 @@ pub fn get_analysis_info(
         unknown_unique_words,
         unknown_unique_chars,
     }
-}
-
-pub fn save_filtered_extraction_info(
-    book: &FlatBook,
-    unknown_words_to_save: &HashSet<&ExtractionItem>,
-    outpath: &str,
-) -> Result<()> {
-    let chapter_titles: Vec<String> = book
-        .chapters
-        .iter()
-        .map(|chapter| chapter.get_numbered_title())
-        .collect();
-    let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
-        .iter()
-        .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
-        .collect();
-    for item in unknown_words_to_save {
-        chapter_vocabulary
-            .get_mut(item.location.as_str())
-            .unwrap()
-            .insert(item);
-    }
-    let chapter_jsons: Vec<Value> = chapter_titles
-        .iter()
-        .map(|chapter_title| {
-            json!({
-            "title": chapter_title,
-            "words": chapter_vocabulary.get(chapter_title.as_str()).unwrap().iter()
-            .map(|item| item.word.as_str()).collect::<Vec<&str>>()
-            })
-        })
-        .collect();
-    let output_json = json!({
-        "title": &book.title,
-        "vocabulary": chapter_jsons
-    });
-    to_writer_pretty(
-        &File::create(outpath).with_context(|| format!("Failed to open file at {}", outpath))?,
-        &output_json,
-    )
-    .context("failed to write result json")
 }
 
 fn ext_item_set_to_char_freq(ext_items: &HashSet<&ExtractionItem>) -> HashMap<String, u64> {
