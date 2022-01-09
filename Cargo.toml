@@ -7,7 +7,7 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0.32"
 clap = "2.33.1"
-crossterm = {version = "0.20", features = ["serde"]}
+crossterm = {version = "0.22", features = ["serde"]}
 epubparse = "0.2.1"
 lazy_static = "1.4.0"
 refinery = {version = "0.8.2", features = ["rusqlite"]}
@@ -16,6 +16,6 @@ rusqlite = "0.26.3"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0.53"
 tempfile = "3.1.0"
-tui = {version = "0.15.0", default-features = false, features = ['crossterm', 'serde']}
+tui = {version = "0.16.0", default-features = false, features = ['crossterm', 'serde']}
 unicode-segmentation = "1.6.0"
 unicode-width = "0.1.8"
