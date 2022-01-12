@@ -3,7 +3,7 @@ use std::io::Write;
 use tui::{
     backend::CrosstermBackend,
     layout::Rect,
-    widgets::{List, ListItem},
+    widgets::{List, ListItem, ListState},
     Frame,
 };
 
@@ -13,7 +13,9 @@ pub fn draw_word_lists(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     area: Rect,
     word_lists: &Vec<WordListMetadata>,
+    selected: Option<usize>,
 ) {
+    // TODO: highlight selected item
     let list_items: Vec<ListItem> = word_lists
         .iter()
         .map(|l| {
@@ -26,6 +28,8 @@ pub fn draw_word_lists(
             ))
         })
         .collect();
-    let word_lists = List::new(list_items);
-    frame.render_widget(word_lists, area);
+    let word_lists = List::new(list_items).highlight_symbol(">");
+    let mut list_state = ListState::default();
+    list_state.select(selected);
+    frame.render_stateful_widget(word_lists, area, &mut list_state);
 }

@@ -133,12 +133,12 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             }
         }
         View::WordLists => {
-            let new_state = match &state.word_list_state {
-                WordListState::ListOfWordLists { word_lists } => {
-                    handle_event_word_lists(&state, key_event)
+            state.word_list_state = match state.word_list_state {
+                ws @ WordListState::ListOfWordLists { .. } => {
+                    handle_event_word_lists(key_event, ws, state.db_connection.clone())
                 }
-                WordListState::OpenedWordList { word_list } => {
-                    handle_event_word_list_detail(&state, key_event)
+                ow @ WordListState::OpenedWordList { .. } => {
+                    handle_event_word_list_detail(key_event, ow, state.db_connection.clone())
                 }
             };
         }
