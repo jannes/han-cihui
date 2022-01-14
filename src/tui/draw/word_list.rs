@@ -12,7 +12,7 @@ use crate::word_lists::WordListMetadata;
 pub fn draw_word_lists(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     area: Rect,
-    word_lists: &Vec<WordListMetadata>,
+    word_lists: &[WordListMetadata],
     selected: Option<usize>,
 ) {
     // TODO: highlight selected item

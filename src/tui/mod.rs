@@ -3,9 +3,11 @@ mod events;
 pub mod state;
 
 use anyhow::Result;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use crossterm::event;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use crossterm::ExecutableCommand;
-use crossterm::{event, terminal};
 use std::time::{Duration, Instant};
 use std::{io, thread};
 use std::{io::Stdout, sync::mpsc};
@@ -36,7 +38,11 @@ impl TuiApp {
     }
 
     pub fn run(mut self) -> Result<()> {
-        enable_raw_mode().expect("can run in raw mode");
+        enable_raw_mode().expect("can not run in raw mode");
+        self.terminal
+            .backend_mut()
+            .execute(EnterAlternateScreen)
+            .expect("failed to enter alternate screen");
         let (tx, rx) = mpsc::channel();
         let tick_rate = Duration::from_millis(200);
         // listen to key events on background thread, which sends them through channel
@@ -71,19 +77,18 @@ impl TuiApp {
                 break;
             }
         }
-        disable_raw_mode()?;
-        self.terminal.show_cursor()?;
         Ok(())
     }
 }
 
 impl Drop for TuiApp {
     fn drop(&mut self) {
+        disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
         self.terminal
             .backend_mut()
-            .execute(terminal::LeaveAlternateScreen)
+            .execute(LeaveAlternateScreen)
             .expect("Could not execute to stdout");
-        terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
+        self.terminal.show_cursor().expect("could not show cursor");
         if std::thread::panicking() {
             eprintln!("exit because of panic, to log the error redirect stderr to a file");
         }

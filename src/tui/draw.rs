@@ -101,7 +101,7 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             WordListState::ListOfWordLists {
                 word_lists,
                 selected,
-            } => draw_word_lists(frame, area, word_lists, selected.clone()),
+            } => draw_word_lists(frame, area, word_lists, *selected),
             WordListState::OpenedWordList { word_list } => todo!(),
         },
         View::Exit => {}
