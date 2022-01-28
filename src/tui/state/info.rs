@@ -11,7 +11,7 @@ use std::{
 use rusqlite::Connection;
 
 use crate::{
-    persistence::sync_anki_data,
+    persistence::db_sync_anki_data,
     vocabulary::{get_vocab_stats, VocabularyInfo},
 };
 
@@ -69,7 +69,7 @@ impl SyncingState {
         let (tx, rx) = mpsc::channel();
         let syncing_thread = thread::spawn(move || {
             let db_conn = db_connection.lock().unwrap();
-            let res = sync_anki_data(&db_conn).and_then(|()| get_vocab_stats(&db_conn));
+            let res = db_sync_anki_data(&db_conn).and_then(|()| get_vocab_stats(&db_conn));
             tx.send(res).expect("could not send event");
         });
         Self {

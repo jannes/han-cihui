@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rusqlite::Connection;
 
 use crate::{
-    persistence::select_all_word_lists_metadata,
+    persistence::db_wlist_select_all_mdata,
     word_lists::{WordList, WordListMetadata},
 };
 
@@ -20,8 +20,8 @@ pub enum WordListState {
 
 impl WordListState {
     pub fn init(db: Arc<Mutex<Connection>>) -> Result<Self> {
-        let word_lists = select_all_word_lists_metadata(&db.lock().unwrap())
-            .context("unable to load word lists")?;
+        let word_lists =
+            db_wlist_select_all_mdata(&db.lock().unwrap()).context("unable to load word lists")?;
         let selected = None;
         Ok(WordListState::ListOfWordLists {
             word_lists,

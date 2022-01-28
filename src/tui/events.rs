@@ -1,4 +1,5 @@
 mod analysis;
+mod books;
 mod info;
 mod word_list;
 
@@ -40,10 +41,14 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                         return Ok(state);
                     }
                     KeyCode::Char('1') => {
-                        state.current_view = View::Analysis;
+                        state.current_view = View::Books;
                         return Ok(state);
                     }
                     KeyCode::Char('2') => {
+                        state.current_view = View::Analysis;
+                        return Ok(state);
+                    }
+                    KeyCode::Char('3') => {
                         state.current_view = View::WordLists;
                         return Ok(state);
                     }
@@ -142,6 +147,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                 }
             };
         }
+        View::Books => {}
         View::Exit => {}
     };
     Ok(state)

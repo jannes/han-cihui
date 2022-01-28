@@ -6,13 +6,13 @@ use std::process::{Command, Stdio};
 use std::str;
 use tempfile::tempdir;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct ChapterSegmentation {
     pub title: String,
     pub cut: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct BookSegmentation {
     pub title_cut: Vec<String>,
     pub chapter_cuts: Vec<ChapterSegmentation>,

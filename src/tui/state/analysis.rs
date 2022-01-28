@@ -2,7 +2,7 @@ use crate::{
     analysis::{get_analysis_info, AnalysisInfo, AnalysisQuery},
     ebook::{open_as_flat_book, FlatBook},
     extraction::{extract_vocab, ExtractionResult},
-    persistence::select_known,
+    persistence::db_words_select_known,
     segmentation::SegmentationMode,
     vocabulary::get_known_chars,
 };
@@ -50,7 +50,7 @@ fn extract(
     filename: &str,
     seg_mode: SegmentationMode,
 ) -> Result<ExtractedState> {
-    let known_words: HashSet<String> = select_known(&db_connection.lock().unwrap())?
+    let known_words: HashSet<String> = db_words_select_known(&db_connection.lock().unwrap())?
         .into_iter()
         .collect();
     let book = open_as_flat_book(filename, 1)?;

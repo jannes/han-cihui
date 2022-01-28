@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     extraction::word_to_hanzi,
-    persistence::{select_all, AddedExternal, VocabStatus},
+    persistence::{db_words_select_all, AddedExternal, VocabStatus},
 };
 use anyhow::Result;
 use rusqlite::Connection;
@@ -55,7 +55,7 @@ pub fn get_known_chars(known_words: &HashSet<String>) -> HashSet<String> {
 }
 
 pub fn get_vocab_stats(data_conn: &Connection) -> Result<VocabularyInfo> {
-    let vocabs = select_all(data_conn)?;
+    let vocabs = db_words_select_all(data_conn)?;
     let amount_total_words = &vocabs.len();
     let mut active: HashSet<String> = HashSet::new();
     let mut suspended_known: HashSet<String> = HashSet::new();

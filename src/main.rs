@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::{env, fs};
 
 use crate::tui::state::analysis::{AnalysisState, ExtractQuery, ExtractingState};
+use crate::tui::state::books::BooksState;
 use crate::tui::state::info::InfoState;
 use crate::tui::state::word_list::WordListState;
 use crate::tui::state::{State, View};
@@ -112,6 +113,7 @@ fn main() -> Result<()> {
                     extract_query,
                     db.clone(),
                 )),
+                books_state: BooksState::Uninitialized,
                 info_state: InfoState::init(db.clone())?,
                 current_view: View::Analysis,
                 db_connection: db.clone(),

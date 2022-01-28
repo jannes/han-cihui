@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use epubparse::types::Book;
 use rusqlite::{params, Connection};
 use std::{
     collections::{HashMap, HashSet},
@@ -9,6 +10,7 @@ use crate::{
     analysis::AnalysisQuery,
     anki_access::{get_zh_notes, NoteStatus},
     cli_commands::zh_field_to_words,
+    segmentation::BookSegmentation,
     word_lists::{ChapterWords, WordList, WordListMetadata},
     ANKIDB_PATH, NOTE_FIELD_PAIRS,
 };
@@ -25,6 +27,16 @@ const STATUS_SUSPENDED_KNOWN: i64 = 1;
 const STATUS_SUSPENDED_UNKNOWN: i64 = 2;
 const STATUS_ADDED_EXTERNAL_KNOWN: i64 = 3;
 const STATUS_ADDED_EXTERNAL_IGNORED: i64 = 4;
+
+// books
+const INSERT_BOOK_QUERY: &str = "
+INSERT INTO books
+(book_name, author_name, book_json)
+VALUES (?1, ?2, ?3)";
+
+const SELECT_ALL_BOOKS_QUERY: &str = "
+SELECT book_name, author_name, book_json
+FROM books";
 
 // word lists
 const INSERT_WORD_LIST_QUERY: &str = "
@@ -100,7 +112,7 @@ pub struct Vocab {
     pub status: VocabStatus,
 }
 
-pub fn add_external_words(
+pub fn db_words_add_external(
     conn: &Connection,
     words: &HashSet<&str>,
     kind: AddedExternal,
@@ -115,14 +127,14 @@ pub fn add_external_words(
     Ok(())
 }
 
-pub fn delete_words(conn: &Connection, words: &HashSet<String>) -> Result<()> {
+pub fn db_words_delete(conn: &Connection, words: &HashSet<String>) -> Result<()> {
     for word in words {
         conn.execute(DELETE_WORD_QUERY, params![word])?;
     }
     Ok(())
 }
 
-pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
+pub fn db_words_insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
     for item in vocab {
         let word = &item.word;
         let status_int = item.status.to_i64();
@@ -131,7 +143,7 @@ pub fn insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
     Ok(())
 }
 
-pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
+pub fn db_words_select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
     let mut stmt = conn.prepare("SELECT * FROM words")?;
     // can not collect as hash set somehow?
     let vocab = stmt
@@ -145,7 +157,10 @@ pub fn select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
     Ok(vocab?.into_iter().collect())
 }
 
-pub fn select_by_status(conn: &Connection, status: VocabStatus) -> Result<HashSet<String>> {
+pub fn db_words_select_by_status(
+    conn: &Connection,
+    status: VocabStatus,
+) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status = {}",
         status.to_i64()
@@ -156,7 +171,7 @@ pub fn select_by_status(conn: &Connection, status: VocabStatus) -> Result<HashSe
     Ok(known_words)
 }
 
-pub fn select_known(conn: &Connection) -> Result<HashSet<String>> {
+pub fn db_words_select_known(conn: &Connection) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status != {}",
         STATUS_SUSPENDED_UNKNOWN
@@ -167,7 +182,7 @@ pub fn select_known(conn: &Connection) -> Result<HashSet<String>> {
     Ok(known_words)
 }
 
-pub fn sync_anki_data(data_conn: &Connection) -> Result<()> {
+pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     let conn = Connection::open(ANKIDB_PATH)?;
     let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
     let zh_notes = get_zh_notes(&conn, &note_field_map)?;
@@ -183,10 +198,25 @@ pub fn sync_anki_data(data_conn: &Connection) -> Result<()> {
             words.into_iter().map(move |word| Vocab { word, status })
         })
         .collect();
-    insert_overwrite(data_conn, &anki_vocab)
+    db_words_insert_overwrite(data_conn, &anki_vocab)
 }
 
-pub fn insert_word_list(conn: &Connection, word_list: WordList) -> Result<()> {
+pub fn db_books_select_all(data_conn: &Connection) -> Result<Vec<BookSegmentation>> {
+    let mut stmt = data_conn.prepare(SELECT_ALL_BOOKS_QUERY)?;
+    let res = stmt
+        .query_map([], |row| {
+            let book_json: String = row.get(2)?;
+            Ok(serde_json::from_str(&book_json).expect("failed to deserialize book"))
+        })?
+        .collect::<Result<Vec<BookSegmentation>, _>>();
+    res.context("sql error when selecting all books")
+}
+
+pub fn db_books_insert(data_conn: &Connection, book: &Book) -> Result<()> {
+    todo!()
+}
+
+pub fn db_wlist_insert(conn: &Connection, word_list: WordList) -> Result<()> {
     let book_name = word_list.metadata.book_name;
     let author_name = word_list.metadata.author_name;
     let min_occ_words = word_list.metadata.analysis_query.min_occurrence_words;
@@ -209,7 +239,7 @@ pub fn insert_word_list(conn: &Connection, word_list: WordList) -> Result<()> {
     Ok(())
 }
 
-pub fn select_all_word_lists_metadata(conn: &Connection) -> Result<Vec<WordListMetadata>> {
+pub fn db_wlist_select_all_mdata(conn: &Connection) -> Result<Vec<WordListMetadata>> {
     let mut query = conn.prepare(SELECT_ALL_WORD_LISTS_QUERY)?;
     let res = query
         .query_map([], |row| {
@@ -234,7 +264,7 @@ pub fn select_all_word_lists_metadata(conn: &Connection) -> Result<Vec<WordListM
     Ok(res)
 }
 
-pub fn select_word_list_by_id(
+pub fn db_wlist_select_by_id(
     conn: &Connection,
     word_list_id: u64,
 ) -> Result<Option<Vec<ChapterWords>>> {

@@ -1,4 +1,5 @@
 mod analysis;
+mod books;
 mod info;
 mod util;
 mod word_list;
@@ -17,6 +18,7 @@ use tui::{
     widgets::{Block, BorderType, Borders, Paragraph, Tabs},
 };
 
+use self::books::{draw_books_display, draw_books_importing, draw_books_loading};
 use self::word_list::draw_word_lists;
 use self::{
     analysis::{
@@ -28,6 +30,7 @@ use self::{
 };
 
 use super::state::analysis::AnalysisState;
+use super::state::books::BooksState;
 use super::state::info::InfoState;
 use super::state::word_list::WordListState;
 use super::state::{State, View};
@@ -104,6 +107,12 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             } => draw_word_lists(frame, area, word_lists, *selected),
             WordListState::OpenedWordList { word_list } => todo!(),
         },
+        View::Books => match &state.books_state {
+            BooksState::Uninitialized => draw_books_loading(frame, area),
+            BooksState::Calculate(calc_state) => draw_books_loading(frame, area),
+            BooksState::Display(display_state) => draw_books_display(frame, display_state, area),
+            BooksState::Importing(partial_path) => draw_books_importing(frame, partial_path, area),
+        },
         View::Exit => {}
     }
 }
@@ -111,16 +120,18 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
 fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let tab_titles = vec![
         "Vocabulary [0]".to_string(),
-        "Analysis [1]".to_string(),
-        "Word Lists [2]".to_string(),
+        "Books [1]".to_string(),
+        "Analysis [2]".to_string(),
+        "Word Lists [3]".to_string(),
     ]
     .into_iter()
     .map(|s| Spans::from(Span::styled(s, Style::default().fg(Color::Yellow))))
     .collect();
     let selected = match state.current_view {
         View::Info => 0,
-        View::Analysis => 1,
-        View::WordLists => 2,
+        View::Books => 1,
+        View::Analysis => 2,
+        View::WordLists => 3,
         View::Exit => 0,
     };
     let tabs = Tabs::new(tab_titles)
@@ -136,10 +147,11 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 
 fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let text = match state.current_view {
+        View::Info => "[S]: sync Anki | [Q]: exit",
+        View::Books => "TODO",
         View::Analysis => {
             "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
         }
-        View::Info => "[S]: sync Anki | [Q]: exit",
         View::WordLists => "[ESC]: overview | [Enter]: select | [J]: down | [K]: up",
         View::Exit => "EXITING",
     };

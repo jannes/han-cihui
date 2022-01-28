@@ -1,6 +1,6 @@
 use crate::{
     extraction::ExtractionItem,
-    persistence::insert_word_list,
+    persistence::db_wlist_insert,
     segmentation::SegmentationMode,
     tui::state::analysis::{AnalysisState, ExtractQuery, ExtractedState, ExtractingState},
     word_lists::construct_word_list,
@@ -33,7 +33,7 @@ pub fn handle_event_analysis_extracted(
                 .iter()
                 .collect();
             let word_list = construct_word_list(book, analysis_query, &unknown_words_to_save);
-            insert_word_list(&db.lock().unwrap(), word_list)
+            db_wlist_insert(&db.lock().unwrap(), word_list)
                 .context("unable to save word list to DB")?;
             action_log_entry = Some(format!("Saved word list for {}", book.title));
         }
