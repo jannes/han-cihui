@@ -11,11 +11,13 @@ use event::KeyEvent;
 use self::analysis::handle_event_analysis_blank;
 use self::analysis::handle_event_analysis_extracted;
 use self::analysis::handle_event_analysis_opening;
+use self::books::handle_event_books_importing;
 use self::info::handle_event_info;
 use self::word_list::handle_event_word_list_detail;
 use self::word_list::handle_event_word_lists;
 
 use super::state::analysis::AnalysisState;
+use super::state::books::BooksState;
 use super::state::info::InfoState;
 use super::state::word_list::WordListState;
 use super::state::State;
@@ -89,6 +91,12 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     }
                 }
             }
+            if let BooksState::Calculating(loading_state) = &mut state.books_state {
+                state.books_state = loading_state.update();
+            }
+            if let BooksState::Importing(importing_state) = &mut state.books_state {
+                todo!()
+            }
             return Ok(state);
         }
     };
@@ -147,7 +155,23 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                 }
             };
         }
-        View::Books => {}
+        View::Books => {
+            state.books_state = match state.books_state {
+                BooksState::Uninitialized => BooksState::init(state.db_connection.clone())?,
+                BooksState::Calculating(calc_state) => todo!(),
+                BooksState::Display(display_state) => todo!(),
+                BooksState::EnterToImport(partial_path) => {
+                    let (new_state, action) = handle_event_books_importing(
+                        partial_path,
+                        key_event,
+                        state.db_connection.clone(),
+                    );
+                    update_action_log(&mut state.action_log, action);
+                    new_state
+                }
+                x @ BooksState::Importing(..) => x,
+            }
+        }
         View::Exit => {}
     };
     Ok(state)

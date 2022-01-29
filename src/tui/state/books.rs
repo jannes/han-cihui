@@ -1,53 +1,90 @@
 use anyhow::Result;
 use std::{
+    cell::RefCell,
     collections::HashSet,
-    sync::{Arc, Mutex},
+    sync::{
+        mpsc::{self, Receiver},
+        Arc, Mutex,
+    },
+    thread::{self, JoinHandle},
+    time::{Duration, Instant},
 };
+use tui::widgets::TableState;
 
 use rusqlite::Connection;
 
 use crate::{
+    ebook::FlatBook,
     extraction::word_to_hanzi,
-    persistence::{db_books_select_all, db_words_select_known},
-    segmentation::BookSegmentation,
+    persistence::{db_books_insert, db_books_select_all, db_words_select_known},
+    segmentation::{segment_book, BookSegmentation, SegmentationMode},
 };
 
 pub enum BooksState {
     Uninitialized,
-    Calculate(CalculatingState),
+    Calculating(CalculatingState),
     Display(DisplayState),
     // String arg: partial file path
-    Importing(String),
+    EnterToImport(String),
+    Importing(ImportingState),
 }
 
 impl BooksState {
     pub fn init(db_connection: Arc<Mutex<Connection>>) -> Result<Self> {
         let books = db_books_select_all(&db_connection.lock().unwrap())?;
         let known_words = db_words_select_known(&db_connection.lock().unwrap())?;
-        Ok(Self::Calculate(CalculatingState::new(books, known_words)))
+        Ok(Self::Calculating(CalculatingState::new(books, known_words)))
+    }
+
+    pub fn is_init(&self) -> bool {
+        if let BooksState::Uninitialized = self {
+            false
+        } else {
+            true
+        }
     }
 }
 
 pub struct CalculatingState {
-    books: Vec<BookSegmentation>,
-    known_words: HashSet<String>,
+    // (title, author, book)
+    pub books: Vec<(String, String, BookSegmentation)>,
+    pub known_words: HashSet<String>,
+    pub start: Instant,
 }
 
 impl CalculatingState {
-    pub fn new(books: Vec<BookSegmentation>, known_words: HashSet<String>) -> Self {
-        Self { books, known_words }
+    pub fn new(
+        books: Vec<(String, String, BookSegmentation)>,
+        known_words: HashSet<String>,
+    ) -> Self {
+        Self {
+            books,
+            known_words,
+            start: Instant::now(),
+        }
     }
 
     pub fn update(&self) -> BooksState {
         let mut books_with_stats = Vec::with_capacity(self.books.len());
-        for book in &self.books {
-            books_with_stats.push(get_enrich_book_with_stats(book.clone(), &self.known_words))
+        for (title, author, book) in &self.books {
+            books_with_stats.push(get_enrich_book_with_stats(
+                title.clone(),
+                author.clone(),
+                book.clone(),
+                &self.known_words,
+            ))
         }
         BooksState::Display(DisplayState::new(books_with_stats))
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
     }
 }
 
 pub fn get_enrich_book_with_stats(
+    title: String,
+    author: String,
     book: BookSegmentation,
     known_words: &HashSet<String>,
 ) -> BookWithStats {
@@ -73,13 +110,16 @@ pub fn get_enrich_book_with_stats(
         book,
         word_comprehension: total_words_known as f64 / total_words as f64,
         total_chars,
+        title,
+        author,
     }
 }
 
 pub struct DisplayState {
-    books_with_stats: Vec<BookWithStats>,
-    sort_descending: bool,
-    sort_by: SortType,
+    pub books_with_stats: Vec<BookWithStats>,
+    pub sort_descending: bool,
+    pub sort_by: SortType,
+    pub table_state: RefCell<TableState>,
 }
 
 impl DisplayState {
@@ -88,14 +128,100 @@ impl DisplayState {
             books_with_stats,
             sort_descending: true,
             sort_by: SortType::Comprehension,
+            table_state: RefCell::new(TableState::default()),
         }
+    }
+
+    pub fn next(&mut self) {
+        let i = match self.table_state.borrow().selected() {
+            Some(i) => {
+                if i >= self.books_with_stats.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.table_state.borrow_mut().select(Some(i));
+    }
+
+    pub fn previous(&mut self) {
+        let i = match self.table_state.borrow().selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.books_with_stats.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.table_state.borrow_mut().select(Some(i));
+    }
+}
+
+pub struct ImportingState {
+    pub book_title: String,
+    pub book_author: String,
+    pub receiver: Receiver<BookSegmentation>,
+    pub segmenter_thread: JoinHandle<()>,
+    pub db_connection: Arc<Mutex<Connection>>,
+    pub start: Instant,
+}
+
+impl ImportingState {
+    pub fn new(book: FlatBook, db_connection: Arc<Mutex<Connection>>) -> Self {
+        let book_title = book.title.clone();
+        let book_author = book.author.clone();
+        let (tx, rx) = mpsc::channel();
+        let segmenter_thread = thread::spawn(move || {
+            let res = segment_book(&book, SegmentationMode::Default);
+            tx.send(res).expect("could not send event");
+        });
+        ImportingState {
+            receiver: rx,
+            segmenter_thread,
+            start: Instant::now(),
+            book_title,
+            book_author,
+            db_connection,
+        }
+    }
+
+    // TODO: improve error handling
+    // update state, return new state if extraction thread terminated, otherwise return None
+    pub fn update(&mut self) -> Option<(BooksState, String)> {
+        match self.receiver.try_recv() {
+            Ok(segmented_book) => {
+                // save book
+                db_books_insert(&self.db_connection.lock().unwrap(), &segmented_book);
+                Some((
+                    BooksState::Uninitialized,
+                    format!("saved {}", self.book_title),
+                ))
+            }
+            Err(e) => match e {
+                mpsc::TryRecvError::Empty => None,
+                mpsc::TryRecvError::Disconnected => Some((
+                    BooksState::Uninitialized,
+                    "Segmentation manager thread disconnected".to_string(),
+                )),
+            },
+        }
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
     }
 }
 
 pub struct BookWithStats {
-    book: BookSegmentation,
-    word_comprehension: f64,
-    total_chars: usize,
+    pub title: String,
+    pub author: String,
+    pub book: BookSegmentation,
+    pub word_comprehension: f64,
+    pub total_chars: usize,
 }
 
 pub enum SortType {

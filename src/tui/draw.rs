@@ -108,10 +108,23 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             WordListState::OpenedWordList { word_list } => todo!(),
         },
         View::Books => match &state.books_state {
-            BooksState::Uninitialized => draw_books_loading(frame, area),
-            BooksState::Calculate(calc_state) => draw_books_loading(frame, area),
+            BooksState::Uninitialized => draw_books_loading(frame, "loading", 0, area),
+            BooksState::Calculating(loading_state) => draw_books_loading(
+                frame,
+                "loading books",
+                loading_state.elapsed().as_secs(),
+                area,
+            ),
             BooksState::Display(display_state) => draw_books_display(frame, display_state, area),
-            BooksState::Importing(partial_path) => draw_books_importing(frame, partial_path, area),
+            BooksState::EnterToImport(partial_path) => {
+                draw_books_importing(frame, partial_path, area)
+            }
+            BooksState::Importing(importing_state) => draw_books_loading(
+                frame,
+                "segmenting book",
+                importing_state.elapsed().as_secs(),
+                area,
+            ),
         },
         View::Exit => {}
     }

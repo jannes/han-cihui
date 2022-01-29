@@ -201,18 +201,24 @@ pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     db_words_insert_overwrite(data_conn, &anki_vocab)
 }
 
-pub fn db_books_select_all(data_conn: &Connection) -> Result<Vec<BookSegmentation>> {
+pub fn db_books_select_all(
+    data_conn: &Connection,
+) -> Result<Vec<(String, String, BookSegmentation)>> {
     let mut stmt = data_conn.prepare(SELECT_ALL_BOOKS_QUERY)?;
     let res = stmt
         .query_map([], |row| {
+            let title: String = row.get(0)?;
+            let author: String = row.get(1)?;
             let book_json: String = row.get(2)?;
-            Ok(serde_json::from_str(&book_json).expect("failed to deserialize book"))
+            let book: BookSegmentation =
+                serde_json::from_str(&book_json).expect("failed to deserialize book");
+            Ok((title, author, book))
         })?
-        .collect::<Result<Vec<BookSegmentation>, _>>();
+        .collect::<Result<Vec<(String, String, BookSegmentation)>, _>>();
     res.context("sql error when selecting all books")
 }
 
-pub fn db_books_insert(data_conn: &Connection, book: &Book) -> Result<()> {
+pub fn db_books_insert(data_conn: &Connection, book: &BookSegmentation) -> Result<()> {
     todo!()
 }
 
