@@ -37,7 +37,8 @@ impl State {
     /// Is the user currently entering something in an input box?
     pub fn currently_input(&self) -> bool {
         match self.current_view {
-            View::Analysis => matches!(self.analysis_state, AnalysisState::Opening(_, _)),
+            View::Analysis => matches!(self.analysis_state, AnalysisState::Opening(..)),
+            View::Books => matches!(self.books_state, BooksState::EnterToImport(..)),
             _ => false,
         }
     }

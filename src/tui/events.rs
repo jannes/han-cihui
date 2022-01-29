@@ -11,7 +11,8 @@ use event::KeyEvent;
 use self::analysis::handle_event_analysis_blank;
 use self::analysis::handle_event_analysis_extracted;
 use self::analysis::handle_event_analysis_opening;
-use self::books::handle_event_books_importing;
+use self::books::handle_event_books_display;
+use self::books::handle_event_books_enter_to_import;
 use self::info::handle_event_info;
 use self::word_list::handle_event_word_list_detail;
 use self::word_list::handle_event_word_lists;
@@ -91,11 +92,20 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     }
                 }
             }
-            if let BooksState::Calculating(loading_state) = &mut state.books_state {
-                state.books_state = loading_state.update();
-            }
-            if let BooksState::Importing(importing_state) = &mut state.books_state {
-                todo!()
+            match &mut state.books_state {
+                BooksState::Uninitialized => {
+                    state.books_state = BooksState::init(state.db_connection.clone())?;
+                }
+                BooksState::Calculating(loading_state) => {
+                    state.books_state = loading_state.update();
+                }
+                BooksState::Importing(importing_state) => {
+                    if let Some((new_state, action)) = importing_state.update() {
+                        state.action_log.push(action);
+                        state.books_state = new_state;
+                    }
+                }
+                _ => {}
             }
             return Ok(state);
         }
@@ -157,11 +167,11 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         }
         View::Books => {
             state.books_state = match state.books_state {
-                BooksState::Uninitialized => BooksState::init(state.db_connection.clone())?,
-                BooksState::Calculating(calc_state) => todo!(),
-                BooksState::Display(display_state) => todo!(),
+                BooksState::Display(display_state) => {
+                    handle_event_books_display(display_state, key_event)
+                }
                 BooksState::EnterToImport(partial_path) => {
-                    let (new_state, action) = handle_event_books_importing(
+                    let (new_state, action) = handle_event_books_enter_to_import(
                         partial_path,
                         key_event,
                         state.db_connection.clone(),
@@ -169,7 +179,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     update_action_log(&mut state.action_log, action);
                     new_state
                 }
-                x @ BooksState::Importing(..) => x,
+                x => x,
             }
         }
         View::Exit => {}

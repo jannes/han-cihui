@@ -1,23 +1,21 @@
 use std::sync::{Arc, Mutex};
 
-use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent};
 use rusqlite::Connection;
 
 use crate::{
     ebook::open_as_flat_book,
-    tui::state::books::{BooksState, CalculatingState, ImportingState},
+    tui::state::books::{BooksState, DisplayState, ImportingState},
 };
 
-pub fn handle_event_books_calculating(
-    mut calculating_state: CalculatingState,
-    key_event: KeyEvent,
-    db: Arc<Mutex<Connection>>,
-) -> Result<(BooksState, Option<String>)> {
-    todo!()
+pub fn handle_event_books_display(state: DisplayState, key_event: KeyEvent) -> BooksState {
+    match key_event.code {
+        KeyCode::Char('i') => BooksState::EnterToImport("".to_string()),
+        _ => BooksState::Display(state),
+    }
 }
 
-pub fn handle_event_books_importing(
+pub fn handle_event_books_enter_to_import(
     mut partial_path: String,
     key_event: KeyEvent,
     db: Arc<Mutex<Connection>>,

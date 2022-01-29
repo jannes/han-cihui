@@ -195,11 +195,16 @@ impl ImportingState {
         match self.receiver.try_recv() {
             Ok(segmented_book) => {
                 // save book
-                db_books_insert(&self.db_connection.lock().unwrap(), &segmented_book);
-                Some((
-                    BooksState::Uninitialized,
-                    format!("saved {}", self.book_title),
-                ))
+                let action = match db_books_insert(
+                    &self.db_connection.lock().unwrap(),
+                    &self.book_title,
+                    &self.book_author,
+                    &segmented_book,
+                ) {
+                    Ok(_) => format!("saved {}", self.book_title),
+                    Err(e) => format!("error saving {}: {}", self.book_title, e),
+                };
+                Some((BooksState::Uninitialized, action))
             }
             Err(e) => match e {
                 mpsc::TryRecvError::Empty => None,

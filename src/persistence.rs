@@ -218,8 +218,15 @@ pub fn db_books_select_all(
     res.context("sql error when selecting all books")
 }
 
-pub fn db_books_insert(data_conn: &Connection, book: &BookSegmentation) -> Result<()> {
-    todo!()
+pub fn db_books_insert(
+    data_conn: &Connection,
+    title: &str,
+    author: &str,
+    book: &BookSegmentation,
+) -> Result<()> {
+    let book_json = serde_json::to_string(book).expect("failed to serialize segmented book");
+    data_conn.execute(INSERT_BOOK_QUERY, params![title, author, book_json])?;
+    Ok(())
 }
 
 pub fn db_wlist_insert(conn: &Connection, word_list: WordList) -> Result<()> {
