@@ -27,11 +27,8 @@ pub fn handle_event_analysis_extracted(
         KeyCode::Char('s') => {
             let book = &extracted_state.book;
             let analysis_query = extracted_state.analysis_query;
-            let unknown_words_to_save: HashSet<&ExtractionItem> = extracted_state
-                .extraction_result
-                .vocabulary_info
-                .iter()
-                .collect();
+            let unknown_words_to_save: HashSet<&ExtractionItem> =
+                extracted_state.extraction_result.iter().collect();
             let word_list = construct_word_list(book, analysis_query, &unknown_words_to_save);
             db_wlist_insert(&db.lock().unwrap(), word_list)
                 .context("unable to save word list to DB")?;

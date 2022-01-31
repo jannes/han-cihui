@@ -8,9 +8,17 @@ use crate::{
     tui::state::books::{BooksState, DisplayState, ImportingState},
 };
 
-pub fn handle_event_books_display(state: DisplayState, key_event: KeyEvent) -> BooksState {
+pub fn handle_event_books_display(mut state: DisplayState, key_event: KeyEvent) -> BooksState {
     match key_event.code {
         KeyCode::Char('i') => BooksState::EnterToImport("".to_string()),
+        KeyCode::Char('j') => {
+            state.select_next();
+            BooksState::Display(state)
+        }
+        KeyCode::Char('k') => {
+            state.select_previous();
+            BooksState::Display(state)
+        }
         _ => BooksState::Display(state),
     }
 }

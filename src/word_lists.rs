@@ -73,7 +73,7 @@ pub fn construct_word_list(
         .collect();
     for item in unknown_words_to_save {
         chapter_vocabulary
-            .get_mut(item.location.as_str())
+            .get_mut(item.first_location.as_str())
             .unwrap()
             .insert(item);
     }

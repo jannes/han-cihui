@@ -91,7 +91,6 @@ pub fn get_enrich_book_with_stats(
     let mut word_sequence = Vec::new();
     word_sequence.extend(&book.title_cut);
     for chapter in &book.chapter_cuts {
-        word_sequence.push(&chapter.title);
         word_sequence.extend(&chapter.cut);
     }
 
@@ -100,11 +99,11 @@ pub fn get_enrich_book_with_stats(
     let mut total_words_known = 0;
 
     for word in word_sequence {
-        let chars = word_to_hanzi(word);
-        total_chars += chars.len();
         if known_words.contains(word) {
             total_words_known += 1;
         }
+        let chars = word_to_hanzi(word);
+        total_chars += chars.len();
     }
     BookWithStats {
         book,
@@ -132,7 +131,7 @@ impl DisplayState {
         }
     }
 
-    pub fn next(&mut self) {
+    pub fn select_next(&mut self) {
         let i = match self.table_state.borrow().selected() {
             Some(i) => {
                 if i >= self.books_with_stats.len() - 1 {
@@ -146,7 +145,7 @@ impl DisplayState {
         self.table_state.borrow_mut().select(Some(i));
     }
 
-    pub fn previous(&mut self) {
+    pub fn select_previous(&mut self) {
         let i = match self.table_state.borrow().selected() {
             Some(i) => {
                 if i == 0 {
@@ -176,7 +175,7 @@ impl ImportingState {
         let book_author = book.author.clone();
         let (tx, rx) = mpsc::channel();
         let segmenter_thread = thread::spawn(move || {
-            let res = segment_book(&book, SegmentationMode::Default);
+            let res = segment_book(&book, SegmentationMode::DictionaryOnly);
             tx.send(res).expect("could not send event");
         });
         ImportingState {

@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use crate::ebook::{FlatBook, FlatChapter};
@@ -7,41 +8,47 @@ use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(PartialEq, Eq, Hash)]
 pub struct ExtractionItem {
-    pub(crate) word: String,
-    pub(crate) frequency: u64,
-    pub(crate) location: String,
+    pub word: String,
+    pub frequency: u64,
+    pub first_location: String,
 }
 
-pub struct ExtractionResult {
-    pub(crate) vocabulary_info: HashSet<ExtractionItem>,
-}
+pub type ExtractionResult = HashSet<ExtractionItem>;
 
 pub fn extract_vocab(book: &FlatBook, segmentation_mode: SegmentationMode) -> ExtractionResult {
-    let word_occur_freq = extract(book, segmentation_mode);
-    let mut vocabulary_info: HashSet<ExtractionItem> = HashSet::new();
-    let mut char_freq_map: HashMap<String, u64> = HashMap::new();
-
-    for (word, (chapter, frequency)) in word_occur_freq {
-        if contains_hanzi(&word) {
-            let characters = word_to_hanzi(&word);
-            for character in characters {
-                if char_freq_map.contains_key(character) {
-                    let v = char_freq_map.get_mut(character).unwrap();
-                    *v += frequency;
-                } else {
-                    char_freq_map.insert(character.to_string(), frequency);
-                }
-            }
-            let extraction_item = ExtractionItem {
-                word,
-                frequency,
-                location: chapter.get_numbered_title(),
-            };
-            vocabulary_info.insert(extraction_item);
-        }
+    if book.chapters.is_empty() {
+        panic!("expected book with at least one chapter!");
     }
+    let parsed = segment_book(book, segmentation_mode);
 
-    ExtractionResult { vocabulary_info }
+    let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
+    let mut word_occurrences: HashMap<&str, &FlatChapter> = HashMap::new();
+    for (i, chapter) in book.chapters.iter().enumerate() {
+        if i == 0 {
+            // include title in first chapter
+            update_word_info(
+                parsed.title_cut.iter(),
+                chapter,
+                &mut word_frequencies,
+                &mut word_occurrences,
+            );
+        }
+        update_word_info(
+            parsed.chapter_cuts.get(i).unwrap().cut.iter(),
+            chapter,
+            &mut word_frequencies,
+            &mut word_occurrences,
+        );
+    }
+    word_occurrences
+        .into_iter()
+        .filter(|(word, _)| contains_hanzi(word))
+        .map(|(word, chapter)| ExtractionItem {
+            word: word.to_string(),
+            frequency: *word_frequencies.get(word).unwrap(),
+            first_location: chapter.get_numbered_title(),
+        })
+        .collect()
 }
 
 pub fn contains_hanzi(word: &str) -> bool {
@@ -56,65 +63,22 @@ pub fn word_to_hanzi(word: &str) -> Vec<&str> {
 }
 
 fn update_word_info<'a, 'b>(
-    words: Vec<&'a str>,
+    words: impl Iterator<Item = &'a String>,
     current_chapter: &'b FlatChapter,
     word_frequencies: &mut HashMap<&'a str, u64>,
     word_occurrences: &mut HashMap<&'a str, &'b FlatChapter>,
 ) {
     for word in words {
-        let mut frequency = 1;
-        if word_frequencies.contains_key(word) {
-            frequency += word_frequencies.get(word).unwrap();
-        } else {
-            word_occurrences.insert(word, current_chapter);
+        match word_frequencies.entry(word) {
+            Entry::Occupied(o) => {
+                *o.into_mut() += 1;
+            }
+            Entry::Vacant(v) => {
+                v.insert(1);
+                word_occurrences.insert(word, current_chapter);
+            }
         }
-        word_frequencies.insert(word, frequency);
     }
-}
-
-fn extract(
-    book: &FlatBook,
-    segmentation_mode: SegmentationMode,
-) -> HashMap<String, (&FlatChapter, u64)> {
-    if book.chapters.is_empty() {
-        panic!("expected book with at least one chapter!");
-    }
-    let parsed = segment_book(book, segmentation_mode);
-
-    let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
-    let mut word_occurrences: HashMap<&str, &FlatChapter> = HashMap::new();
-    for (i, chapter) in book.chapters.iter().enumerate() {
-        if i == 0 {
-            update_word_info(
-                parsed.title_cut.iter().map(|w| w.as_str()).collect(),
-                chapter,
-                &mut word_frequencies,
-                &mut word_occurrences,
-            );
-        }
-        update_word_info(
-            parsed
-                .chapter_cuts
-                .get(i)
-                .unwrap()
-                .cut
-                .iter()
-                .map(|w| w.as_str())
-                .collect(),
-            chapter,
-            &mut word_frequencies,
-            &mut word_occurrences,
-        );
-    }
-    word_occurrences
-        .into_iter()
-        .map(|(word, chapter)| {
-            (
-                word.to_string(),
-                (chapter, *word_frequencies.get(word).unwrap()),
-            )
-        })
-        .collect()
 }
 
 #[cfg(test)]
