@@ -1,8 +1,8 @@
 use crate::{
     analysis::{get_analysis_info, AnalysisInfo, AnalysisQuery},
+    db::vocab::db_words_select_known,
     ebook::{open_as_flat_book, FlatBook},
     extraction::{extract_vocab, ExtractionResult},
-    persistence::db_words_select_known,
     segmentation::SegmentationMode,
     vocabulary::get_known_chars,
 };

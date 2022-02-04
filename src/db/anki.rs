@@ -8,6 +8,29 @@ use std::{
     convert::TryInto,
 };
 
+use crate::{cli_commands::zh_field_to_words, ANKIDB_PATH, NOTE_FIELD_PAIRS};
+
+use super::vocab::{db_words_insert_overwrite, Vocab, VocabStatus};
+
+pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
+    let conn = Connection::open(ANKIDB_PATH)?;
+    let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
+    let zh_notes = get_zh_notes(&conn, &note_field_map)?;
+    let anki_vocab: Vec<Vocab> = zh_notes
+        .iter()
+        .flat_map(|note| {
+            let status = match note.status {
+                NoteStatus::Active => VocabStatus::Active,
+                NoteStatus::SuspendedKnown => VocabStatus::SuspendedKnown,
+                NoteStatus::SuspendedUnknown => VocabStatus::SuspendedUnknown,
+            };
+            let words = zh_field_to_words(&note.zh_field);
+            words.into_iter().map(move |word| Vocab { word, status })
+        })
+        .collect();
+    db_words_insert_overwrite(data_conn, &anki_vocab)
+}
+
 pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
 pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 

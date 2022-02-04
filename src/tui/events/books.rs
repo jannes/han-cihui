@@ -4,22 +4,37 @@ use crossterm::event::{KeyCode, KeyEvent};
 use rusqlite::Connection;
 
 use crate::{
+    db::books::db_books_delete,
     ebook::open_as_flat_book,
     tui::state::books::{BooksState, DisplayState, ImportingState},
 };
 
-pub fn handle_event_books_display(mut state: DisplayState, key_event: KeyEvent) -> BooksState {
+pub fn handle_event_books_display(
+    mut state: DisplayState,
+    key_event: KeyEvent,
+    db: Arc<Mutex<Connection>>,
+) -> (BooksState, Option<String>) {
     match key_event.code {
-        KeyCode::Char('i') => BooksState::EnterToImport("".to_string()),
+        KeyCode::Char('i') => (BooksState::EnterToImport("".to_string()), None),
         KeyCode::Char('j') => {
             state.select_next();
-            BooksState::Display(state)
+            (BooksState::Display(state), None)
         }
         KeyCode::Char('k') => {
             state.select_previous();
-            BooksState::Display(state)
+            (BooksState::Display(state), None)
         }
-        _ => BooksState::Display(state),
+        KeyCode::Char('d') => {
+            if let Some(book) = state.remove_current() {
+                let action = match db_books_delete(&db.lock().unwrap(), &book.title, &book.author) {
+                    Ok(_) => Some(format!("deleted {}", book.title)),
+                    Err(e) => Some(format!("deletion failed, err: {:?}", e)),
+                };
+                return (BooksState::Display(state), action);
+            }
+            (BooksState::Display(state), None)
+        }
+        _ => (BooksState::Display(state), None),
     }
 }
 

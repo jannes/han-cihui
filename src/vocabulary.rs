@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use crate::{
+    db::vocab::{db_words_select_all, AddedExternal, VocabStatus},
     extraction::word_to_hanzi,
-    persistence::{db_words_select_all, AddedExternal, VocabStatus},
 };
 use anyhow::Result;
 use rusqlite::Connection;

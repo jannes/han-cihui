@@ -9,10 +9,12 @@ use rusqlite::Connection;
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{
-    anki_access::{self, NoteStatus, ZhNote},
-    persistence::{
-        db_words_add_external, db_words_delete, db_words_select_all, db_words_select_by_status,
-        db_words_select_known, AddedExternal, VocabStatus,
+    db::{
+        anki::{get_zh_notes, NoteStatus, ZhNote},
+        vocab::{
+            db_words_add_external, db_words_delete, db_words_select_all, db_words_select_by_status,
+            db_words_select_known, AddedExternal, VocabStatus,
+        },
     },
     NOTE_FIELD_PAIRS, WORD_DELIMITERS,
 };
@@ -82,7 +84,7 @@ pub fn show(matches: &ArgMatches, conn: &Connection) -> Result<()> {
 
 pub fn print_anki_stats(conn: &Connection) -> Result<()> {
     let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
-    let zh_notes = anki_access::get_zh_notes(conn, &note_field_map)?;
+    let zh_notes = get_zh_notes(conn, &note_field_map)?;
 
     let active_words = notes_to_words_filtered(&zh_notes, NoteStatus::Active);
     let inactive_unknown_words = notes_to_words_filtered(&zh_notes, NoteStatus::SuspendedUnknown);

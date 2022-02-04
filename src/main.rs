@@ -14,20 +14,19 @@ use crate::tui::state::word_list::WordListState;
 use crate::tui::state::{State, View};
 use crate::tui::TuiApp;
 use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
+use db::vocab::AddedExternal;
 use rusqlite::Connection;
 
 use crate::cli_args::get_arg_matches;
-use crate::persistence::AddedExternal;
 use crate::segmentation::SegmentationMode;
 use anyhow::Result;
 
 mod analysis;
-mod anki_access;
 mod cli_args;
 mod cli_commands;
+mod db;
 mod ebook;
 mod extraction;
-mod persistence;
 mod segmentation;
 mod tui;
 mod vocabulary;

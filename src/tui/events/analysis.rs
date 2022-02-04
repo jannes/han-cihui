@@ -1,6 +1,6 @@
 use crate::{
+    db::word_lists::db_wlist_insert,
     extraction::ExtractionItem,
-    persistence::db_wlist_insert,
     segmentation::SegmentationMode,
     tui::state::analysis::{AnalysisState, ExtractQuery, ExtractedState, ExtractingState},
     word_lists::construct_word_list,

@@ -14,9 +14,12 @@ use tui::widgets::TableState;
 use rusqlite::Connection;
 
 use crate::{
+    db::{
+        books::{db_books_insert, db_books_select_all},
+        vocab::db_words_select_known,
+    },
     ebook::FlatBook,
     extraction::word_to_hanzi,
-    persistence::{db_books_insert, db_books_select_all, db_words_select_known},
     segmentation::{segment_book, BookSegmentation, SegmentationMode},
 };
 
@@ -132,6 +135,9 @@ impl DisplayState {
     }
 
     pub fn select_next(&mut self) {
+        if self.books_with_stats.is_empty() {
+            return;
+        }
         let i = match self.table_state.borrow().selected() {
             Some(i) => {
                 if i >= self.books_with_stats.len() - 1 {
@@ -146,6 +152,9 @@ impl DisplayState {
     }
 
     pub fn select_previous(&mut self) {
+        if self.books_with_stats.is_empty() {
+            return;
+        }
         let i = match self.table_state.borrow().selected() {
             Some(i) => {
                 if i == 0 {
@@ -157,6 +166,27 @@ impl DisplayState {
             None => 0,
         };
         self.table_state.borrow_mut().select(Some(i));
+    }
+
+    pub fn remove_current(&mut self) -> Option<BookWithStats> {
+        let (to_select, book) = match self.table_state.borrow().selected() {
+            Some(i) => {
+                let book = self.books_with_stats.remove(i);
+                let index = if i >= self.books_with_stats.len() {
+                    if i == 0 {
+                        None
+                    } else {
+                        Some(i - 1)
+                    }
+                } else {
+                    Some(i)
+                };
+                (index, Some(book))
+            }
+            None => (None, None),
+        };
+        self.table_state.borrow_mut().select(to_select);
+        book
     }
 }
 

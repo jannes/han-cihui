@@ -11,7 +11,7 @@ use std::{
 use rusqlite::Connection;
 
 use crate::{
-    persistence::db_sync_anki_data,
+    db::anki::db_sync_anki_data,
     vocabulary::{get_vocab_stats, VocabularyInfo},
 };
 

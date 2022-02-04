@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use rusqlite::Connection;
 
 use crate::{
-    persistence::db_wlist_select_all_mdata,
+    db::word_lists::db_wlist_select_all_mdata,
     word_lists::{WordList, WordListMetadata},
 };
 

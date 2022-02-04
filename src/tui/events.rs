@@ -168,7 +168,13 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         View::Books => {
             state.books_state = match state.books_state {
                 BooksState::Display(display_state) => {
-                    handle_event_books_display(display_state, key_event)
+                    let (new_state, action) = handle_event_books_display(
+                        display_state,
+                        key_event,
+                        state.db_connection.clone(),
+                    );
+                    update_action_log(&mut state.action_log, action);
+                    new_state
                 }
                 BooksState::EnterToImport(partial_path) => {
                     let (new_state, action) = handle_event_books_enter_to_import(
