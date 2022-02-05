@@ -8,9 +8,28 @@ use std::{
     convert::TryInto,
 };
 
-use crate::{cli_commands::zh_field_to_words, ANKIDB_PATH, NOTE_FIELD_PAIRS};
-
 use super::vocab::{db_words_insert_overwrite, Vocab, VocabStatus};
+
+pub const ANKIDB_PATH: &str =
+    "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
+const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
+const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
+
+pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
+pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum NoteStatus {
+    Active,
+    SuspendedKnown,
+    SuspendedUnknown,
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct ZhNote {
+    pub zh_field: String,
+    pub status: NoteStatus,
+}
 
 pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     let conn = Connection::open(ANKIDB_PATH)?;
@@ -29,53 +48,6 @@ pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
         })
         .collect();
     db_words_insert_overwrite(data_conn, &anki_vocab)
-}
-
-pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
-pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum NoteStatus {
-    Active,
-    SuspendedKnown,
-    SuspendedUnknown,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct ZhNote {
-    pub zh_field: String,
-    pub status: NoteStatus,
-}
-
-pub fn get_zh_notes(
-    conn: &Connection,
-    note_field_map: &HashMap<&str, &str>,
-) -> Result<HashSet<ZhNote>> {
-    let fields_info = get_zh_fields(conn, note_field_map)?;
-    let mut all_notes: HashSet<ZhNote> = HashSet::new();
-    for notetype_field in fields_info {
-        let notetype_id = notetype_field.notetype_id;
-        let field_index = notetype_field.field_order;
-        all_notes.extend(select_notes(
-            conn,
-            notetype_id,
-            field_index,
-            NoteStatus::Active,
-        )?);
-        all_notes.extend(select_notes(
-            conn,
-            notetype_id,
-            field_index,
-            NoteStatus::SuspendedUnknown,
-        )?);
-        all_notes.extend(select_notes(
-            conn,
-            notetype_id,
-            field_index,
-            NoteStatus::SuspendedKnown,
-        )?);
-    }
-    Ok(all_notes)
 }
 
 /**
@@ -106,6 +78,44 @@ const SELECT_INACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
 const SELECT_NOTETYPES_SQL: &str = "SELECT notetypes.id, notetypes.name, FIELDS.name, FIELDS.ord \
             FROM notetypes JOIN FIELDS \
             ON notetypes.id = FIELDS.ntid";
+
+fn zh_field_to_words(field: &str) -> Vec<String> {
+    field
+        .split(&WORD_DELIMITERS[..])
+        .map(String::from)
+        .collect()
+}
+
+fn get_zh_notes(
+    conn: &Connection,
+    note_field_map: &HashMap<&str, &str>,
+) -> Result<HashSet<ZhNote>> {
+    let fields_info = get_zh_fields(conn, note_field_map)?;
+    let mut all_notes: HashSet<ZhNote> = HashSet::new();
+    for notetype_field in fields_info {
+        let notetype_id = notetype_field.notetype_id;
+        let field_index = notetype_field.field_order;
+        all_notes.extend(select_notes(
+            conn,
+            notetype_id,
+            field_index,
+            NoteStatus::Active,
+        )?);
+        all_notes.extend(select_notes(
+            conn,
+            notetype_id,
+            field_index,
+            NoteStatus::SuspendedUnknown,
+        )?);
+        all_notes.extend(select_notes(
+            conn,
+            notetype_id,
+            field_index,
+            NoteStatus::SuspendedKnown,
+        )?);
+    }
+    Ok(all_notes)
+}
 
 fn select_notes(
     conn: &Connection,

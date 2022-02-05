@@ -19,6 +19,7 @@ pub struct BookSegmentation {
 }
 
 #[derive(Clone, Copy)]
+#[allow(dead_code)]
 pub enum SegmentationMode {
     Default,
     DictionaryOnly,
@@ -77,53 +78,4 @@ pub fn segment_book(book: &FlatBook, segmentation_mode: SegmentationMode) -> Boo
 
     serde_json::from_str(output.as_str())
         .expect("expected valid json structure in format of BookSegmentation struct")
-
-    // let stdin = han_segmenter_process.stdin.as_mut().unwrap();
-    // let stdout = han_segmenter_process.stdout.as_mut().unwrap();
-    // stdout.
-    //
-    // let title_cut = get_segments(&book.title, &mut han_segmenter_process, stdin);
-    // let mut chapter_cuts = Vec::new();
-    // for chapter in &book.chapters {
-    //     let title_cut = get_segments(&chapter.title, &mut han_segmenter_process, stdin);
-    //     let content_cut = get_segments(&chapter.content, &mut han_segmenter_process, stdin);
-    //     chapter_cuts.push(ChapterSegmentation {
-    //         title_cut,
-    //         content_cut,
-    //     })
-    // }
-    // BookSegmentation {
-    //     title_cut,
-    //     chapter_cuts,
-    // }
 }
-//
-// fn get_segments(
-//     s: &str,
-//     segmenter_process: &mut Child,
-//     segmenter_stdin: &mut ChildStdin,
-// ) -> Vec<String> {
-//     if let Err(why) = segmenter_stdin.write(s.as_bytes()) {
-//         panic!(
-//             "failed to write to stdin of han-segmenter process, error: {}",
-//             why
-//         )
-//     }
-//     let output = match segmenter_process.wait_with_output() {
-//         Ok(output) => output,
-//         Err(why) => panic!(
-//             "failed to read stdout of han-segmenter process, error: {}",
-//             why
-//         ),
-//     };
-//
-//     if output.status.success() {
-//         str::from_utf8(&output.stdout)
-//             .expect("expected python output to be utf8")
-//             .split('\n')
-//             .map(|s| s.to_string())
-//             .collect()
-//     } else {
-//         panic!("python return status non zero")
-//     }
-// }

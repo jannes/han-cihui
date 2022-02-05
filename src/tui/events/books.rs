@@ -6,23 +6,30 @@ use rusqlite::Connection;
 use crate::{
     db::books::db_books_delete,
     ebook::open_as_flat_book,
-    tui::state::books::{BooksState, DisplayState, ImportingState},
+    tui::state::{
+        analysis::AnalysisState,
+        books::{BooksState, DisplayState, ImportingState},
+    },
 };
 
 pub fn handle_event_books_display(
     mut state: DisplayState,
     key_event: KeyEvent,
     db: Arc<Mutex<Connection>>,
-) -> (BooksState, Option<String>) {
+) -> (BooksState, Option<AnalysisState>, Option<String>) {
     match key_event.code {
-        KeyCode::Char('i') => (BooksState::EnterToImport("".to_string()), None),
+        KeyCode::Char('i') => (BooksState::EnterToImport("".to_string()), None, None),
+        KeyCode::Char('a') => {
+            if let Some(book) = state.get_current() {}
+            todo!()
+        }
         KeyCode::Char('j') => {
             state.select_next();
-            (BooksState::Display(state), None)
+            (BooksState::Display(state), None, None)
         }
         KeyCode::Char('k') => {
             state.select_previous();
-            (BooksState::Display(state), None)
+            (BooksState::Display(state), None, None)
         }
         KeyCode::Char('d') => {
             if let Some(book) = state.remove_current() {
@@ -30,11 +37,11 @@ pub fn handle_event_books_display(
                     Ok(_) => Some(format!("deleted {}", book.title)),
                     Err(e) => Some(format!("deletion failed, err: {:?}", e)),
                 };
-                return (BooksState::Display(state), action);
+                return (BooksState::Display(state), None, action);
             }
-            (BooksState::Display(state), None)
+            (BooksState::Display(state), None, None)
         }
-        _ => (BooksState::Display(state), None),
+        _ => (BooksState::Display(state), None, None),
     }
 }
 

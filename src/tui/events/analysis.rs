@@ -94,7 +94,8 @@ pub fn handle_event_analysis_opening(
                 filename: partial_path.clone(),
                 segmentation_mode: seg_mode,
             };
-            let analysis_state = AnalysisState::Extracting(ExtractingState::new(extract_query, db));
+            let analysis_state =
+                AnalysisState::Extracting(ExtractingState::from_query(extract_query, db));
             return (
                 analysis_state,
                 Some(format!("opening {} for analysis", partial_path)),

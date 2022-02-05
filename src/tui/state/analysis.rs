@@ -59,7 +59,7 @@ fn extract(
 }
 
 impl ExtractingState {
-    pub fn new(query: ExtractQuery, db_connection: Arc<Mutex<Connection>>) -> Self {
+    pub fn from_query(query: ExtractQuery, db_connection: Arc<Mutex<Connection>>) -> Self {
         let (tx, rx) = mpsc::channel();
         let filename = query.filename.clone();
         let segmentation_mode = query.segmentation_mode;

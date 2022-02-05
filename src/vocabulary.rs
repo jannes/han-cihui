@@ -54,6 +54,13 @@ pub fn get_known_chars(known_words: &HashSet<String>) -> HashSet<String> {
         .collect()
 }
 
+pub fn get_known_words_and_chars(known_words: HashSet<String>) -> HashSet<String> {
+    known_words
+        .union(&get_known_chars(&known_words))
+        .map(|s| s.to_string())
+        .collect::<HashSet<String>>()
+}
+
 pub fn get_vocab_stats(data_conn: &Connection) -> Result<VocabularyInfo> {
     let vocabs = db_words_select_all(data_conn)?;
     let amount_total_words = &vocabs.len();

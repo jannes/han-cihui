@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use crate::ebook::{FlatBook, FlatChapter};
-use crate::segmentation::{segment_book, SegmentationMode};
+use crate::segmentation::{segment_book, BookSegmentation, SegmentationMode};
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -19,22 +19,28 @@ pub fn extract_vocab(book: &FlatBook, segmentation_mode: SegmentationMode) -> Ex
     if book.chapters.is_empty() {
         panic!("expected book with at least one chapter!");
     }
-    let parsed = segment_book(book, segmentation_mode);
+    let segmented = segment_book(book, segmentation_mode);
+    extract_vocab_from_segmented(book, &segmented)
+}
 
+pub fn extract_vocab_from_segmented(
+    book: &FlatBook,
+    segmented: &BookSegmentation,
+) -> ExtractionResult {
     let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
     let mut word_occurrences: HashMap<&str, &FlatChapter> = HashMap::new();
     for (i, chapter) in book.chapters.iter().enumerate() {
         if i == 0 {
             // include title in first chapter
             update_word_info(
-                parsed.title_cut.iter(),
+                segmented.title_cut.iter(),
                 chapter,
                 &mut word_frequencies,
                 &mut word_occurrences,
             );
         }
         update_word_info(
-            parsed.chapter_cuts.get(i).unwrap().cut.iter(),
+            segmented.chapter_cuts.get(i).unwrap().cut.iter(),
             chapter,
             &mut word_frequencies,
             &mut word_occurrences,

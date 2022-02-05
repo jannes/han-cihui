@@ -3,27 +3,18 @@ extern crate clap;
 extern crate lazy_static;
 extern crate rusqlite;
 
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
-use std::{env, fs};
-
-use crate::tui::state::analysis::{AnalysisState, ExtractQuery, ExtractingState};
-use crate::tui::state::books::BooksState;
-use crate::tui::state::info::InfoState;
-use crate::tui::state::word_list::WordListState;
-use crate::tui::state::{State, View};
+use crate::tui::state::State;
 use crate::tui::TuiApp;
-use cli_commands::{perform_add_external, perform_delete_external, print_anki_stats, show};
+use cli::{get_arg_matches, perform_add_external, perform_delete_external};
 use db::vocab::AddedExternal;
 use rusqlite::Connection;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
 
-use crate::cli_args::get_arg_matches;
-use crate::segmentation::SegmentationMode;
 use anyhow::Result;
 
 mod analysis;
-mod cli_args;
-mod cli_commands;
+mod cli;
 mod db;
 mod ebook;
 mod extraction;
@@ -32,12 +23,8 @@ mod tui;
 mod vocabulary;
 mod word_lists;
 
-pub const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
-pub const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
-
 #[cfg(not(debug_assertions))]
 const DATA_DIR: &str = "/Users/jannes/.han-cihui";
-const ANKIDB_PATH: &str = "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
 
 // making sure that when developing the path to the data directory has to be explicitely set
 #[cfg(debug_assertions)]
@@ -88,38 +75,6 @@ fn main() -> Result<()> {
             let matches = matches.subcommand_matches("add-ignore").unwrap();
             let filename = matches.value_of("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Ignored)
-        }
-        Some("show") => {
-            let matches = matches.subcommand_matches("show").unwrap();
-            show(matches, &data_conn)
-        }
-        Some("anki-stats") => print_anki_stats(&data_conn),
-        Some("analyze") => {
-            let subcommand_matches = matches.subcommand_matches("analyze").unwrap();
-            let filename = subcommand_matches.value_of("filename").unwrap();
-            let segmentation_mode = if subcommand_matches.is_present("dict-only") {
-                SegmentationMode::DictionaryOnly
-            } else {
-                SegmentationMode::Default
-            };
-            let extract_query = ExtractQuery {
-                filename: filename.to_string(),
-                segmentation_mode,
-            };
-            let db = Arc::new(Mutex::new(data_conn));
-            let state = State {
-                analysis_state: AnalysisState::Extracting(ExtractingState::new(
-                    extract_query,
-                    db.clone(),
-                )),
-                books_state: BooksState::Uninitialized,
-                info_state: InfoState::init(db.clone())?,
-                current_view: View::Analysis,
-                db_connection: db.clone(),
-                action_log: vec![],
-                word_list_state: WordListState::init(db)?,
-            };
-            TuiApp::new_stdout(state)?.run()
         }
         _ => TuiApp::new_stdout(State::new(data_conn)?)?.run(),
     }

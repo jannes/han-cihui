@@ -21,6 +21,7 @@ use crate::{
     ebook::FlatBook,
     extraction::word_to_hanzi,
     segmentation::{segment_book, BookSegmentation, SegmentationMode},
+    vocabulary::get_known_words_and_chars,
 };
 
 pub enum BooksState {
@@ -36,7 +37,11 @@ impl BooksState {
     pub fn init(db_connection: Arc<Mutex<Connection>>) -> Result<Self> {
         let books = db_books_select_all(&db_connection.lock().unwrap())?;
         let known_words = db_words_select_known(&db_connection.lock().unwrap())?;
-        Ok(Self::Calculating(CalculatingState::new(books, known_words)))
+        let known_words_and_chars = get_known_words_and_chars(known_words);
+        Ok(Self::Calculating(CalculatingState::new(
+            books,
+            known_words_and_chars,
+        )))
     }
 
     pub fn is_init(&self) -> bool {
@@ -51,18 +56,18 @@ impl BooksState {
 pub struct CalculatingState {
     // (title, author, book)
     pub books: Vec<(String, String, BookSegmentation)>,
-    pub known_words: HashSet<String>,
+    pub known_words_and_chars: HashSet<String>,
     pub start: Instant,
 }
 
 impl CalculatingState {
     pub fn new(
         books: Vec<(String, String, BookSegmentation)>,
-        known_words: HashSet<String>,
+        known_words_and_chars: HashSet<String>,
     ) -> Self {
         Self {
             books,
-            known_words,
+            known_words_and_chars,
             start: Instant::now(),
         }
     }
@@ -74,7 +79,7 @@ impl CalculatingState {
                 title.clone(),
                 author.clone(),
                 book.clone(),
-                &self.known_words,
+                &self.known_words_and_chars,
             ))
         }
         BooksState::Display(DisplayState::new(books_with_stats))
@@ -166,6 +171,14 @@ impl DisplayState {
             None => 0,
         };
         self.table_state.borrow_mut().select(Some(i));
+    }
+
+    pub fn get_current(&mut self) -> Option<&BookWithStats> {
+        if let Some(i) = self.table_state.borrow().selected() {
+            self.books_with_stats.get(i)
+        } else {
+            None
+        }
     }
 
     pub fn remove_current(&mut self) -> Option<BookWithStats> {
