@@ -89,11 +89,8 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             }
         },
         View::WordLists => match &state.word_list_state {
-            WordListState::ListOfWordLists {
-                word_lists,
-                selected,
-            } => draw_word_lists(frame, area, word_lists, *selected),
-            WordListState::OpenedWordList { word_list } => todo!(),
+            WordListState::List(lists_state) => draw_word_lists(frame, lists_state, area),
+            WordListState::Opened(list_state) => todo!(),
         },
         View::Books => match &state.books_state {
             BooksState::Uninitialized => draw_books_loading(frame, "loading", 0, area),

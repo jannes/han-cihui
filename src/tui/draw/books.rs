@@ -39,15 +39,15 @@ pub fn draw_books_display(
     state: &books::DisplayState,
     area: Rect,
 ) {
-    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
-    let normal_style = Style::default().bg(Color::Blue);
+    let header_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
     let header_cells = ["Book", "Author", "Comprehension", "Length"]
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(Color::Red)));
-    let header = Row::new(header_cells)
-        .style(normal_style)
-        .height(1)
-        .bottom_margin(1);
+        .map(|h| Cell::from(*h).style(header_style));
+    let header = Row::new(header_cells).height(1).bottom_margin(1);
+
+    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let rows = state.books_with_stats.iter().map(|b| {
         let cells = vec![
             Cell::from(b.title.clone()),
@@ -55,11 +55,11 @@ pub fn draw_books_display(
             Cell::from(format!("{}", b.word_comprehension)),
             Cell::from(format!("{}", b.total_chars)),
         ];
-        Row::new(cells).bottom_margin(1)
+        Row::new(cells)
     });
-    let t = Table::new(rows)
+    let table = Table::new(rows)
         .header(header)
-        .block(Block::default().borders(Borders::ALL).title("Table"))
+        .block(Block::default().borders(Borders::ALL))
         .highlight_style(selected_style)
         .highlight_symbol(">> ")
         .widths(&[
@@ -68,7 +68,7 @@ pub fn draw_books_display(
             Constraint::Percentage(25),
             Constraint::Percentage(25),
         ]);
-    frame.render_stateful_widget(t, area, &mut state.table_state.borrow_mut());
+    frame.render_stateful_widget(table, area, &mut state.table_state.borrow_mut());
 }
 
 pub fn draw_books_importing(
