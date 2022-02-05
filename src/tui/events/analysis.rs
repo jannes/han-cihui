@@ -1,8 +1,7 @@
 use crate::{
     db::word_lists::db_wlist_insert,
     extraction::ExtractionItem,
-    segmentation::SegmentationMode,
-    tui::state::analysis::{AnalysisState, ExtractQuery, ExtractedState, ExtractingState},
+    tui::state::analysis::{AnalysisState, ExtractedState},
     word_lists::construct_word_list,
 };
 use anyhow::{Context, Result};
@@ -15,8 +14,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub fn handle_event_analysis_extracted(
-    mut extracted_state: ExtractedState,
+pub fn handle_event_analysis(
+    mut extracted_state: Box<ExtractedState>,
     key_event: KeyEvent,
     db: Arc<Mutex<Connection>>,
 ) -> Result<(AnalysisState, Option<String>)> {
@@ -74,46 +73,4 @@ pub fn handle_event_analysis_extracted(
     }
     extracted_state.query_update(analysis_query);
     Ok((AnalysisState::Extracted(extracted_state), action_log_entry))
-}
-
-pub fn handle_event_analysis_opening(
-    mut partial_path: String,
-    key_event: KeyEvent,
-    seg_mode: SegmentationMode,
-    db: Arc<Mutex<Connection>>,
-) -> (AnalysisState, Option<String>) {
-    match key_event.code {
-        KeyCode::Char(c) => {
-            partial_path.push(c);
-        }
-        KeyCode::Backspace => {
-            partial_path.pop();
-        }
-        KeyCode::Esc => {
-            return (AnalysisState::Blank, Some("canceled open".to_string()));
-        }
-        KeyCode::Enter => {
-            let extract_query = ExtractQuery {
-                filename: partial_path.clone(),
-                segmentation_mode: seg_mode,
-            };
-            let analysis_state =
-                AnalysisState::Extracting(ExtractingState::from_query(extract_query, db));
-            return (
-                analysis_state,
-                Some(format!("opening {} for analysis", partial_path)),
-            );
-        }
-        _ => {}
-    }
-    (AnalysisState::Opening(partial_path, seg_mode), None)
-}
-
-pub fn handle_event_analysis_blank(key_event: KeyEvent) -> AnalysisState {
-    match key_event.code {
-        KeyCode::Char('e') => {
-            AnalysisState::Opening("".to_string(), SegmentationMode::DictionaryOnly)
-        }
-        _ => AnalysisState::Blank,
-    }
 }

@@ -26,10 +26,10 @@ pub fn handle_event_books_display(
                 (state.get_current(), state.known_words_and_chars.clone())
             {
                 let extraction_result = extract_vocab_from_segmented(book.book.clone());
-                analysis_state = Some(AnalysisState::Extracted(ExtractedState::new(
+                analysis_state = Some(AnalysisState::Extracted(Box::new(ExtractedState::new(
                     extraction_result,
                     known_words_and_chars,
-                )));
+                ))));
                 action = Some(format!("open {} for analysis", book.title));
             };
             (BooksState::Display(state), analysis_state, action)

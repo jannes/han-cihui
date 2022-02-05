@@ -43,10 +43,6 @@ impl BooksState {
             known_words_and_chars,
         )))
     }
-
-    pub fn is_init(&self) -> bool {
-        !matches!(self, BooksState::Uninitialized)
-    }
 }
 
 pub struct CalculatingState {

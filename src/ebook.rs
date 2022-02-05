@@ -4,6 +4,8 @@ use epubparse::types::Book;
 use epubparse::types::Chapter;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize)]
 pub struct FlatBook {
@@ -33,12 +35,14 @@ impl FlatChapter {
 }
 
 pub fn open_as_flat_book(filename: &str, depth: u32) -> Result<FlatBook> {
-    let book = open_epub_as_book(filename)?;
+    let path_no_escaped_whitespace: String = filename.split('\\').into_iter().collect();
+    let path = PathBuf::from(path_no_escaped_whitespace);
+    let book = open_epub_as_book(&path)?;
     Ok(flatten_book(&book, depth))
 }
 
-fn open_epub_as_book(filename: &str) -> Result<Book> {
-    let bytes = fs::read(filename)?;
+fn open_epub_as_book(filepath: &Path) -> Result<Book> {
+    let bytes = fs::read(filepath)?;
     Ok(epub_to_book(&bytes)?)
 }
 

@@ -1,17 +1,11 @@
 use crate::tui::draw::util::{
-    draw_centered_input, get_analysis_info_percentage_table, get_analysis_info_table,
-    get_centered_rect, split_to_lines,
+    get_analysis_info_percentage_table, get_analysis_info_table, get_centered_rect, split_to_lines,
 };
-use crate::tui::state::analysis::{ExtractedState, ExtractingState};
-use anyhow::Error;
+use crate::tui::state::analysis::ExtractedState;
 use std::io::Write;
 use tui::layout::{Alignment, Constraint, Direction, Layout};
 use tui::text::Spans;
-use tui::{
-    backend::CrosstermBackend,
-    layout::Rect,
-    widgets::{Clear, Wrap},
-};
+use tui::{backend::CrosstermBackend, layout::Rect};
 use tui::{
     style::{Color, Style},
     Frame,
@@ -69,47 +63,10 @@ pub fn draw_analysis_extracted(
     );
 }
 
-pub fn draw_analysis_extracting(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    state: &ExtractingState,
-    area: Rect,
-) {
-    let amount_dots = (state.elapsed().as_secs() % 10) as usize;
-    let text = format!("Extracting {}", ".".repeat(amount_dots));
-    let area = get_centered_rect(area);
-    let paragraph = Paragraph::new(text)
-        .block(
-            Block::default()
-                .title("Extracting from epub")
-                .borders(Borders::ALL),
-        )
-        .alignment(Alignment::Left)
-        .wrap(Wrap { trim: true });
-    frame.render_widget(Clear, area); //this clears out the background
-    frame.render_widget(paragraph, area);
-}
-
-pub fn draw_analysis_extracted_error(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    error: &Error,
-    area: Rect,
-) {
-    let msg = format!("{}\n\n\nPress [E] to open another file", error);
-    draw_centered_input(frame, area, &msg, "Error extracting");
-}
-
-pub fn draw_analysis_opening(
-    frame: &mut Frame<CrosstermBackend<impl Write>>,
-    partial_path: &str,
-    area: Rect,
-) {
-    draw_centered_input(frame, area, partial_path, "Path to epub file to open")
-}
-
 pub fn draw_analysis_blank(frame: &mut Frame<CrosstermBackend<impl Write>>, area: Rect) {
     let area = get_centered_rect(area);
     let inner_width = (area.width - 2) as usize;
-    let msg = "press [E] to enter path of epub to extract vocab from";
+    let msg = "go to books tab and select one for analysis";
     let msg = split_to_lines(msg, inner_width, None)
         .into_iter()
         .map(|line| Spans::from(vec![Span::raw(line)]))

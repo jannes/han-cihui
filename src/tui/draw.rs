@@ -21,10 +21,7 @@ use tui::{
 use self::books::{draw_books_display, draw_books_importing, draw_books_loading};
 use self::word_list::draw_word_lists;
 use self::{
-    analysis::{
-        draw_analysis_blank, draw_analysis_extracted, draw_analysis_extracted_error,
-        draw_analysis_extracting, draw_analysis_opening,
-    },
+    analysis::{draw_analysis_blank, draw_analysis_extracted},
     info::{draw_info, draw_info_syncing},
     util::get_wrapping_spans,
 };
@@ -79,17 +76,8 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
             AnalysisState::Blank => {
                 draw_analysis_blank(frame, area);
             }
-            AnalysisState::Opening(partial_path, _) => {
-                draw_analysis_opening(frame, partial_path, area);
-            }
             AnalysisState::Extracted(extracted_state) => {
                 draw_analysis_extracted(frame, extracted_state, area);
-            }
-            AnalysisState::ExtractError(e) => {
-                draw_analysis_extracted_error(frame, e, area);
-            }
-            AnalysisState::Extracting(extracting_state) => {
-                draw_analysis_extracting(frame, extracting_state, area);
             }
         },
         View::Info => match &state.info_state {
@@ -161,7 +149,7 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
 fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
     let text = match state.current_view {
         View::Info => "[S]: sync Anki | [Q]: exit",
-        View::Books => "TODO",
+        View::Books => "[I]: import new book | [A]: analyze",
         View::Analysis => {
             "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
         }

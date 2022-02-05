@@ -8,9 +8,7 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use event::KeyEvent;
 
-use self::analysis::handle_event_analysis_blank;
-use self::analysis::handle_event_analysis_extracted;
-use self::analysis::handle_event_analysis_opening;
+use self::analysis::handle_event_analysis;
 use self::books::handle_event_books_display;
 use self::books::handle_event_books_enter_to_import;
 use self::info::handle_event_info;
@@ -61,22 +59,6 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
             key_event
         }
         Event::Tick => {
-            if let AnalysisState::Extracting(extracting_state) = &mut state.analysis_state {
-                if let Some(new_state) = extracting_state.update() {
-                    match &new_state {
-                        AnalysisState::ExtractError(_) => update_action_log(
-                            &mut state.action_log,
-                            Some("Failed extraction".to_string()),
-                        ),
-                        AnalysisState::Extracted(_) => update_action_log(
-                            &mut state.action_log,
-                            Some("Extraction success".to_string()),
-                        ),
-                        _ => {}
-                    }
-                    state.analysis_state = new_state;
-                }
-            }
             if let InfoState::Syncing(syncing_state) = &mut state.info_state {
                 if let Some(new_state) = syncing_state.update() {
                     // if sync successfully completed, add msg to action log
@@ -115,7 +97,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         View::Analysis => {
             state.analysis_state = match state.analysis_state {
                 AnalysisState::Extracted(extracted_state) => {
-                    let (new_state, action) = handle_event_analysis_extracted(
+                    let (new_state, action) = handle_event_analysis(
                         extracted_state,
                         key_event,
                         state.db_connection.clone(),
@@ -123,18 +105,6 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     update_action_log(&mut state.action_log, action);
                     new_state
                 }
-                AnalysisState::Opening(partial_path, seg_mode) => {
-                    let (new_state, action) = handle_event_analysis_opening(
-                        partial_path,
-                        key_event,
-                        seg_mode,
-                        state.db_connection.clone(),
-                    );
-                    update_action_log(&mut state.action_log, action);
-                    new_state
-                }
-                AnalysisState::Blank => handle_event_analysis_blank(key_event),
-                AnalysisState::ExtractError(_) => handle_event_analysis_blank(key_event),
                 x => x,
             }
         }

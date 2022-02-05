@@ -1,8 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
-use crate::ebook::FlatBook;
-use crate::segmentation::{segment_book, BookSegmentation, SegmentationMode};
+use crate::segmentation::BookSegmentation;
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -18,15 +17,10 @@ pub struct ExtractionResult {
     pub vocabulary: HashSet<ExtractionItem>,
 }
 
-pub fn extract_vocab(book: &FlatBook, segmentation_mode: SegmentationMode) -> ExtractionResult {
-    if book.chapters.is_empty() {
+pub fn extract_vocab_from_segmented(segmented_book: BookSegmentation) -> ExtractionResult {
+    if segmented_book.chapter_cuts.is_empty() {
         panic!("expected book with at least one chapter!");
     }
-    let segmented = segment_book(book, segmentation_mode);
-    extract_vocab_from_segmented(segmented)
-}
-
-pub fn extract_vocab_from_segmented(segmented_book: BookSegmentation) -> ExtractionResult {
     let mut word_frequencies: HashMap<&str, u64> = HashMap::new();
     let mut word_occurrences: HashMap<&str, &str> = HashMap::new();
     for (i, chapter) in segmented_book
