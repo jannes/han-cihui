@@ -6,8 +6,9 @@ use rusqlite::Connection;
 use crate::{
     db::books::db_books_delete,
     ebook::open_as_flat_book,
+    extraction::extract_vocab_from_segmented,
     tui::state::{
-        analysis::AnalysisState,
+        analysis::{AnalysisState, ExtractedState},
         books::{BooksState, DisplayState, ImportingState},
     },
 };
@@ -20,8 +21,18 @@ pub fn handle_event_books_display(
     match key_event.code {
         KeyCode::Char('i') => (BooksState::EnterToImport("".to_string()), None, None),
         KeyCode::Char('a') => {
-            if let Some(book) = state.get_current() {}
-            todo!()
+            let (mut analysis_state, mut action) = (None, None);
+            if let (Some(book), known_words_and_chars) =
+                (state.get_current(), state.known_words_and_chars.clone())
+            {
+                let extraction_result = extract_vocab_from_segmented(book.book.clone());
+                analysis_state = Some(AnalysisState::Extracted(ExtractedState::new(
+                    extraction_result,
+                    known_words_and_chars,
+                )));
+                action = Some(format!("open {} for analysis", book.title));
+            };
+            (BooksState::Display(state), analysis_state, action)
         }
         KeyCode::Char('j') => {
             state.select_next();
@@ -62,7 +73,7 @@ pub fn handle_event_books_enter_to_import(
         }
         KeyCode::Enter => match open_as_flat_book(&partial_path, 1) {
             Ok(b) => {
-                let action = Some(format!("imported {} by {}", &b.title, &b.author));
+                let action = Some(format!("segmenting {} by {}", &b.title, &b.author));
                 return (BooksState::Importing(ImportingState::new(b, db)), action);
             }
             Err(e) => {

@@ -45,11 +45,7 @@ impl BooksState {
     }
 
     pub fn is_init(&self) -> bool {
-        if let BooksState::Uninitialized = self {
-            false
-        } else {
-            true
-        }
+        !matches!(self, BooksState::Uninitialized)
     }
 }
 
@@ -82,7 +78,10 @@ impl CalculatingState {
                 &self.known_words_and_chars,
             ))
         }
-        BooksState::Display(DisplayState::new(books_with_stats))
+        BooksState::Display(DisplayState::new(
+            books_with_stats,
+            self.known_words_and_chars.clone(),
+        ))
     }
 
     pub fn elapsed(&self) -> Duration {
@@ -127,15 +126,20 @@ pub struct DisplayState {
     pub sort_descending: bool,
     pub sort_by: SortType,
     pub table_state: RefCell<TableState>,
+    pub known_words_and_chars: HashSet<String>,
 }
 
 impl DisplayState {
-    pub fn new(books_with_stats: Vec<BookWithStats>) -> Self {
+    pub fn new(
+        books_with_stats: Vec<BookWithStats>,
+        known_words_and_chars: HashSet<String>,
+    ) -> Self {
         Self {
             books_with_stats,
             sort_descending: true,
             sort_by: SortType::Comprehension,
             table_state: RefCell::new(TableState::default()),
+            known_words_and_chars,
         }
     }
 
@@ -173,7 +177,7 @@ impl DisplayState {
         self.table_state.borrow_mut().select(Some(i));
     }
 
-    pub fn get_current(&mut self) -> Option<&BookWithStats> {
+    pub fn get_current(&self) -> Option<&BookWithStats> {
         if let Some(i) = self.table_state.borrow().selected() {
             self.books_with_stats.get(i)
         } else {
@@ -243,7 +247,7 @@ impl ImportingState {
                     &self.book_author,
                     &segmented_book,
                 ) {
-                    Ok(_) => format!("saved {}", self.book_title),
+                    Ok(_) => format!("saved {} by {}", self.book_title, self.book_author),
                     Err(e) => format!("error saving {}: {}", self.book_title, e),
                 };
                 Some((BooksState::Uninitialized, action))

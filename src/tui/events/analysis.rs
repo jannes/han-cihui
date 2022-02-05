@@ -25,14 +25,17 @@ pub fn handle_event_analysis_extracted(
     match key_event.code {
         KeyCode::Char('r') => return Ok((AnalysisState::Blank, None)),
         KeyCode::Char('s') => {
-            let book = &extracted_state.book;
+            let book = &extracted_state.extraction_result.segmented_book;
             let analysis_query = extracted_state.analysis_query;
-            let unknown_words_to_save: HashSet<&ExtractionItem> =
-                extracted_state.extraction_result.iter().collect();
+            let unknown_words_to_save: HashSet<&ExtractionItem> = extracted_state
+                .extraction_result
+                .vocabulary
+                .iter()
+                .collect();
             let word_list = construct_word_list(book, analysis_query, &unknown_words_to_save);
             db_wlist_insert(&db.lock().unwrap(), word_list)
                 .context("unable to save word list to DB")?;
-            action_log_entry = Some(format!("Saved word list for {}", book.title));
+            action_log_entry = Some(format!("Saved word list for {}", book.title_cut.join("")));
         }
         // reduce min_occurrence of words
         KeyCode::Char('j') => {

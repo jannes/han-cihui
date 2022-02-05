@@ -1,5 +1,5 @@
-use crate::ebook::FlatBook;
 use crate::extraction::ExtractionItem;
+use crate::segmentation::BookSegmentation;
 use std::collections::{HashMap, HashSet};
 use std::time::SystemTime;
 
@@ -58,18 +58,14 @@ pub enum Category {
 
 // construct word list from book and analysis query/result
 pub fn construct_word_list(
-    book: &FlatBook,
+    book: &BookSegmentation,
     analysis_query: AnalysisQuery,
     unknown_words_to_save: &HashSet<&ExtractionItem>,
 ) -> WordList {
-    let chapter_titles: Vec<String> = book
-        .chapters
-        .iter()
-        .map(|chapter| chapter.get_numbered_title())
-        .collect();
+    let chapter_titles: Vec<&str> = book.chapter_cuts.iter().map(|c| c.title.as_str()).collect();
     let mut chapter_vocabulary: HashMap<&str, HashSet<&ExtractionItem>> = chapter_titles
         .iter()
-        .map(|chapter_title| (chapter_title.as_str(), HashSet::new()))
+        .map(|chapter_title| (*chapter_title, HashSet::new()))
         .collect();
     for item in unknown_words_to_save {
         chapter_vocabulary
@@ -81,7 +77,7 @@ pub fn construct_word_list(
         .iter()
         .map(|chapter_name| {
             let tagged_words: Vec<TaggedWord> = chapter_vocabulary
-                .get(chapter_name.as_str())
+                .get(chapter_name)
                 .unwrap()
                 .iter()
                 .map(|item| TaggedWord::new(item.word.as_str()))
@@ -94,8 +90,8 @@ pub fn construct_word_list(
         .collect();
     let metadata = WordListMetadata {
         id: -1,
-        book_name: book.title.clone(),
-        author_name: book.author.clone(),
+        book_name: book.title_cut.join(""),
+        author_name: "".to_string(),
         create_time: SystemTime::now(),
         analysis_query,
     };

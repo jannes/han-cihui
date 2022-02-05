@@ -1,10 +1,10 @@
 use crate::{
     analysis::{get_analysis_info, AnalysisInfo, AnalysisQuery},
     db::vocab::db_words_select_known,
-    ebook::{open_as_flat_book, FlatBook},
+    ebook::open_as_flat_book,
     extraction::{extract_vocab, ExtractionResult},
     segmentation::SegmentationMode,
-    vocabulary::get_known_chars,
+    vocabulary::get_known_words_and_chars,
 };
 use anyhow::{anyhow, Result};
 use rusqlite::Connection;
@@ -53,9 +53,10 @@ fn extract(
     let known_words: HashSet<String> = db_words_select_known(&db_connection.lock().unwrap())?
         .into_iter()
         .collect();
+    let known_words_and_chars = get_known_words_and_chars(known_words);
     let book = open_as_flat_book(filename, 1)?;
     let ext_res = extract_vocab(&book, seg_mode);
-    Ok(ExtractedState::new(book, ext_res, known_words, true))
+    Ok(ExtractedState::new(ext_res, known_words_and_chars))
 }
 
 impl ExtractingState {
@@ -98,32 +99,17 @@ impl ExtractingState {
 }
 
 pub struct ExtractedState {
-    pub book: FlatBook,
     pub extraction_result: ExtractionResult,
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
-    pub known_chars_are_known_words: bool,
-    known_words: HashSet<String>,
-    known_words_chars: HashSet<String>,
+    known_words_and_chars: HashSet<String>,
 }
 
 impl ExtractedState {
     pub fn new(
-        book: FlatBook,
         extraction_result: ExtractionResult,
-        known_words: HashSet<String>,
-        known_chars_are_known_words: bool,
+        known_words_and_chars: HashSet<String>,
     ) -> Self {
-        let known_words_chars = known_words
-            .union(&get_known_chars(&known_words))
-            .map(|s| s.to_string())
-            .collect::<HashSet<String>>();
-        let known = if known_chars_are_known_words {
-            &known_words_chars
-        } else {
-            &known_words
-        };
-
         let query_all = AnalysisQuery {
             min_occurrence_words: 1,
             min_occurrence_unknown_chars: None,
@@ -137,34 +123,23 @@ impl ExtractedState {
         let info_all = get_analysis_info(
             &extraction_result,
             query_all.min_occurrence_words,
-            known,
+            &known_words_and_chars,
             query_all.min_occurrence_unknown_chars,
         );
         let info_min3 = get_analysis_info(
             &extraction_result,
             query_min3.min_occurrence_words,
-            known,
+            &known_words_and_chars,
             query_min3.min_occurrence_unknown_chars,
         );
         analysis_infos.insert(query_all, info_all);
         analysis_infos.insert(query_min3, info_min3);
 
         ExtractedState {
-            book,
             extraction_result,
             analysis_query: query_min3,
             analysis_infos,
-            known_chars_are_known_words,
-            known_words,
-            known_words_chars,
-        }
-    }
-
-    pub fn get_known_words(&self) -> &HashSet<String> {
-        if self.known_chars_are_known_words {
-            &self.known_words_chars
-        } else {
-            &self.known_words
+            known_words_and_chars,
         }
     }
 
@@ -181,15 +156,10 @@ impl ExtractedState {
         if let Some(info) = self.analysis_infos.get(&query) {
             *info
         } else {
-            let known_words = if self.known_chars_are_known_words {
-                &self.known_words_chars
-            } else {
-                &self.known_words
-            };
             get_analysis_info(
                 &self.extraction_result,
                 query.min_occurrence_words,
-                known_words,
+                &self.known_words_and_chars,
                 query.min_occurrence_unknown_chars,
             )
         }

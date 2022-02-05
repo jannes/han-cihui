@@ -31,7 +31,8 @@ pub fn get_filtered_extraction_items<'a>(
     min_occurrence_unknown_chars: Option<u64>,
 ) -> HashSet<&'a ExtractionItem> {
     let known_chars = get_known_chars(known_words);
-    let all_char_frequencies = ext_item_set_to_char_freq(&extraction_res.iter().collect());
+    let all_char_frequencies =
+        ext_item_set_to_char_freq(&extraction_res.vocabulary.iter().collect());
     let unknown_char_frequencies: HashMap<&str, u64> = all_char_frequencies
         .iter()
         .filter(|(c, _freq)| !known_chars.contains(*c))
@@ -51,6 +52,7 @@ pub fn get_filtered_extraction_items<'a>(
         }
     };
     extraction_res
+        .vocabulary
         .iter()
         .filter(|item| occurrence_condition(item))
         .collect()
