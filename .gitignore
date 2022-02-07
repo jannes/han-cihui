@@ -3,4 +3,5 @@ target/
 **/__pycache__
 tocs/
 test-data-dir/
+err.log
 

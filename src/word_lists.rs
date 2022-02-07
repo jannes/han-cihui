@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::analysis::AnalysisQuery;
 
+#[derive(Clone)]
 pub struct WordListMetadata {
     pub id: i64,
     pub book_name: String,

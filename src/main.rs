@@ -9,6 +9,7 @@ use cli::{get_arg_matches, perform_add_external, perform_delete_external};
 use db::vocab::AddedExternal;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::{env, fs};
 
 use anyhow::Result;
@@ -22,6 +23,19 @@ mod segmentation;
 mod tui;
 mod vocabulary;
 mod word_lists;
+
+lazy_static! {
+    static ref DB: Mutex<Option<Connection>> = Mutex::new(None);
+}
+
+macro_rules! get_db {
+    () => {
+        DB.lock()
+            .unwrap()
+            .as_ref()
+            .expect("connection not initialized yet!")
+    };
+}
 
 #[cfg(not(debug_assertions))]
 const DATA_DIR: &str = "/Users/jannes/.han-cihui";
@@ -56,6 +70,7 @@ fn main() -> Result<()> {
         fs::create_dir(&data_dir)?;
     }
     let db_path: PathBuf = [data_dir.as_path(), Path::new("data.db")].iter().collect();
+    *DB.lock().unwrap() = Some(Connection::open(&db_path)?);
     let mut data_conn = Connection::open(db_path)?;
     embedded::migrations::runner().run(&mut data_conn)?;
 

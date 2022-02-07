@@ -72,7 +72,7 @@ pub fn db_wlist_select_all_mdata(conn: &Connection) -> Result<Vec<WordListMetada
 
 pub fn db_wlist_select_by_id(
     conn: &Connection,
-    word_list_id: u64,
+    word_list_id: i64,
 ) -> Result<Option<Vec<ChapterWords>>> {
     let mut query = conn.prepare(SELECT_WORD_LIST_QUERY)?;
     let res = query

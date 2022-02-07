@@ -10,10 +10,12 @@ use rusqlite::Connection;
 pub fn handle_event_word_lists(
     key_event: KeyEvent,
     mut state: ListOfWordLists,
-    db: Arc<Mutex<Connection>>,
+    db_conn: Arc<Mutex<Connection>>,
 ) -> WordListState {
     match key_event.code {
-        KeyCode::Enter => todo!(),
+        KeyCode::Enter => {
+            return state.try_open(&db_conn.lock().unwrap());
+        }
         KeyCode::Char('j') => {
             state.select_next();
         }
@@ -28,7 +30,7 @@ pub fn handle_event_word_lists(
     WordListState::List(state)
 }
 
-pub fn handle_event_word_list_detail(
+pub fn handle_event_word_list_opened(
     key_event: KeyEvent,
     state: OpenedWordList,
     db: Arc<Mutex<Connection>>,

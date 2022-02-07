@@ -8,7 +8,7 @@ use tui::{
     Frame,
 };
 
-use crate::tui::state::word_list::ListOfWordLists;
+use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList};
 
 pub fn draw_word_lists(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
@@ -47,5 +47,35 @@ pub fn draw_word_lists(
             Constraint::Percentage(25),
             Constraint::Percentage(25),
         ]);
+    frame.render_stateful_widget(table, area, &mut state.table_state.borrow_mut());
+}
+
+pub fn draw_opened_word_list(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    state: &OpenedWordList,
+    area: Rect,
+) {
+    let header_style = Style::default()
+        .fg(Color::Yellow)
+        .add_modifier(Modifier::BOLD);
+    let header_cells = ["Book", "Author", "#w", "#c"]
+        .iter()
+        .map(|h| Cell::from(*h).style(header_style));
+    let header = Row::new(header_cells).height(1).bottom_margin(1);
+
+    let selected_style = Style::default().add_modifier(Modifier::REVERSED);
+    let rows = state.chapter_infos().iter().map(|ci| {
+        let cells = vec![
+            Cell::from(ci.chapter_words.chapter_name.clone()),
+            Cell::from(format!("{}", "lalal")),
+        ];
+        Row::new(cells)
+    });
+    let table = Table::new(rows)
+        .header(header)
+        .block(Block::default().borders(Borders::ALL))
+        .highlight_style(selected_style)
+        .highlight_symbol(">> ")
+        .widths(&[Constraint::Percentage(75), Constraint::Percentage(25)]);
     frame.render_stateful_widget(table, area, &mut state.table_state.borrow_mut());
 }

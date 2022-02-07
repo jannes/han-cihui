@@ -12,7 +12,7 @@ use self::analysis::handle_event_analysis;
 use self::books::handle_event_books_display;
 use self::books::handle_event_books_enter_to_import;
 use self::info::handle_event_info;
-use self::word_list::handle_event_word_list_detail;
+use self::word_list::handle_event_word_list_opened;
 use self::word_list::handle_event_word_lists;
 
 use super::state::analysis::AnalysisState;
@@ -130,7 +130,7 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                 WordListState::List(lists_state) => {
                     handle_event_word_lists(key_event, lists_state, state.db_connection.clone())
                 }
-                WordListState::Opened(opened_state) => handle_event_word_list_detail(
+                WordListState::Opened(opened_state) => handle_event_word_list_opened(
                     key_event,
                     opened_state,
                     state.db_connection.clone(),

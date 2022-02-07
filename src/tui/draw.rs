@@ -19,7 +19,7 @@ use tui::{
 };
 
 use self::books::{draw_books_display, draw_books_importing, draw_books_loading};
-use self::word_list::draw_word_lists;
+use self::word_list::{draw_opened_word_list, draw_word_lists};
 use self::{
     analysis::{draw_analysis_blank, draw_analysis_extracted},
     info::{draw_info, draw_info_syncing},
@@ -90,7 +90,7 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
         },
         View::WordLists => match &state.word_list_state {
             WordListState::List(lists_state) => draw_word_lists(frame, lists_state, area),
-            WordListState::Opened(list_state) => todo!(),
+            WordListState::Opened(list_state) => draw_opened_word_list(frame, list_state, area),
         },
         View::Books => match &state.books_state {
             BooksState::Uninitialized => draw_books_loading(frame, "loading", 0, area),
