@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListState};
+use anyhow::Result;
 
 use crossterm::event;
 use crossterm::event::KeyCode;
@@ -11,7 +12,7 @@ pub fn handle_event_word_lists(
     key_event: KeyEvent,
     mut state: ListOfWordLists,
     db_conn: Arc<Mutex<Connection>>,
-) -> WordListState {
+) -> Result<WordListState> {
     match key_event.code {
         KeyCode::Enter => {
             return state.try_open(&db_conn.lock().unwrap());
@@ -27,13 +28,31 @@ pub fn handle_event_word_lists(
         }
         _ => {}
     }
-    WordListState::List(state)
+    Ok(WordListState::List(state))
 }
 
 pub fn handle_event_word_list_opened(
     key_event: KeyEvent,
-    state: OpenedWordList,
+    mut state: OpenedWordList,
     db: Arc<Mutex<Connection>>,
-) -> WordListState {
-    todo!()
+) -> Result<WordListState> {
+    match key_event.code {
+        KeyCode::Enter => {
+            todo!()
+        }
+        KeyCode::Esc => {
+            return WordListState::init(db);
+        }
+        KeyCode::Char('j') => {
+            state.select_next();
+        }
+        KeyCode::Char('k') => {
+            state.select_previous();
+        }
+        KeyCode::Char('s') => {
+            todo!()
+        }
+        _ => {}
+    }
+    Ok(WordListState::Opened(state))
 }

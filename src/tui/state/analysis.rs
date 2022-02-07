@@ -19,7 +19,7 @@ pub struct ExtractedState {
     pub extraction_result: ExtractionResult,
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
-    known_words_and_chars: HashSet<String>,
+    pub known_words_and_chars: HashSet<String>,
 }
 
 impl ExtractedState {

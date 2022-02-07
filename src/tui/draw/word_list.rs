@@ -58,7 +58,7 @@ pub fn draw_opened_word_list(
     let header_style = Style::default()
         .fg(Color::Yellow)
         .add_modifier(Modifier::BOLD);
-    let header_cells = ["Book", "Author", "#w", "#c"]
+    let header_cells = ["Chapter", "Filtered", "To Learn", "Total"]
         .iter()
         .map(|h| Cell::from(*h).style(header_style));
     let header = Row::new(header_cells).height(1).bottom_margin(1);
@@ -66,8 +66,10 @@ pub fn draw_opened_word_list(
     let selected_style = Style::default().add_modifier(Modifier::REVERSED);
     let rows = state.chapter_infos().iter().map(|ci| {
         let cells = vec![
-            Cell::from(ci.chapter_words.chapter_name.clone()),
-            Cell::from(format!("{}", "lalal")),
+            Cell::from(ci.chapter_title().to_string()),
+            Cell::from(ci.is_filtered().to_string()),
+            Cell::from(ci.words_to_learn().to_string()),
+            Cell::from(ci.words_total().to_string()),
         ];
         Row::new(cells)
     });
@@ -76,6 +78,11 @@ pub fn draw_opened_word_list(
         .block(Block::default().borders(Borders::ALL))
         .highlight_style(selected_style)
         .highlight_symbol(">> ")
-        .widths(&[Constraint::Percentage(75), Constraint::Percentage(25)]);
+        .widths(&[
+            Constraint::Percentage(40),
+            Constraint::Percentage(10),
+            Constraint::Percentage(25),
+            Constraint::Percentage(25),
+        ]);
     frame.render_stateful_widget(table, area, &mut state.table_state.borrow_mut());
 }

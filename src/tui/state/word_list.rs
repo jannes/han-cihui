@@ -9,7 +9,7 @@ use tui::widgets::TableState;
 
 use crate::{
     db::word_lists::{db_wlist_select_all_mdata, db_wlist_select_by_id},
-    word_lists::{ChapterWords, TaggedWord, WordList, WordListMetadata},
+    word_lists::{Category, ChapterWords, TaggedWord, WordList, WordListMetadata},
 };
 
 pub enum WordListState {
@@ -69,7 +69,7 @@ impl ListOfWordLists {
         self.table_state.borrow_mut().select(Some(i));
     }
 
-    pub fn try_open(self, db_conn: &Connection) -> WordListState {
+    pub fn try_open(self, db_conn: &Connection) -> Result<WordListState> {
         let wl_mdata = match self.table_state.borrow().selected() {
             Some(i) => self.word_lists.get(i),
             None => None,
@@ -77,15 +77,15 @@ impl ListOfWordLists {
         match wl_mdata {
             Some(wl_mdata) => {
                 let chapters = db_wlist_select_by_id(db_conn, wl_mdata.id)
-                    .expect("db error when selecting word list by id")
+                    .context("db error when selecting word list by id")?
                     .expect("word list with id did not exist in db");
                 let wl = WordList {
                     metadata: wl_mdata.clone(),
                     words_per_chapter: chapters,
                 };
-                WordListState::Opened(OpenedWordList::new(wl))
+                Ok(WordListState::Opened(OpenedWordList::new(wl)))
             }
-            None => WordListState::List(self),
+            None => Ok(WordListState::List(self)),
         }
     }
 }
@@ -94,39 +94,6 @@ pub struct OpenedWordList {
     metadata: WordListMetadata,
     chapter_infos: Vec<WLChapterInfo>,
     pub table_state: RefCell<TableState>,
-}
-
-pub struct WLChapterInfo {
-    pub chapter_words: ChapterWords,
-    filtered: bool,
-}
-
-impl WLChapterInfo {
-    pub fn new(cw: ChapterWords) -> Self {
-        let mut res = Self {
-            chapter_words: cw,
-            filtered: false,
-        };
-        res.update_status();
-        res
-    }
-
-    pub fn modify_tw(&mut self, f: impl Fn(&mut Vec<TaggedWord>)) {
-        f(&mut self.chapter_words.tagged_words);
-        self.update_status();
-    }
-
-    pub fn is_filtered(&self) -> bool {
-        self.filtered
-    }
-
-    fn update_status(&mut self) {
-        self.filtered = self
-            .chapter_words
-            .tagged_words
-            .iter()
-            .all(|tw| tw.category.is_some());
-    }
 }
 
 impl OpenedWordList {
@@ -146,5 +113,92 @@ impl OpenedWordList {
 
     pub fn chapter_infos(&self) -> &Vec<WLChapterInfo> {
         &self.chapter_infos
+    }
+
+    pub fn select_next(&mut self) {
+        if self.chapter_infos.is_empty() {
+            return;
+        }
+        let i = match self.table_state.borrow().selected() {
+            Some(i) => {
+                if i >= self.chapter_infos.len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.table_state.borrow_mut().select(Some(i));
+    }
+
+    pub fn select_previous(&mut self) {
+        if self.chapter_infos.is_empty() {
+            return;
+        }
+        let i = match self.table_state.borrow().selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.chapter_infos.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.table_state.borrow_mut().select(Some(i));
+    }
+}
+
+pub struct WLChapterInfo {
+    chapter_words: ChapterWords,
+    words_to_learn: usize,
+    filtered: bool,
+}
+
+impl WLChapterInfo {
+    pub fn new(cw: ChapterWords) -> Self {
+        let mut res = Self {
+            chapter_words: cw,
+            words_to_learn: 0,
+            filtered: false,
+        };
+        res.update_status();
+        res
+    }
+
+    pub fn chapter_title(&self) -> &str {
+        &self.chapter_words.chapter_name
+    }
+
+    pub fn is_filtered(&self) -> bool {
+        self.filtered
+    }
+
+    pub fn words_total(&self) -> usize {
+        self.chapter_words.tagged_words.len()
+    }
+
+    pub fn words_to_learn(&self) -> usize {
+        self.words_to_learn
+    }
+
+    pub fn modify_tw(&mut self, f: impl Fn(&mut Vec<TaggedWord>)) {
+        f(&mut self.chapter_words.tagged_words);
+        self.update_status();
+    }
+
+    fn update_status(&mut self) {
+        self.filtered = true;
+        self.words_to_learn = 0;
+        self.chapter_words.tagged_words.iter().for_each(|tw| {
+            if let Some(cat) = tw.category {
+                if let Category::Learn = cat {
+                    self.words_to_learn += 1;
+                }
+            } else {
+                self.filtered = false;
+            };
+        });
     }
 }

@@ -150,7 +150,10 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
         View::Analysis => {
             "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
         }
-        View::WordLists => "[ESC]: overview | [Enter]: select | [J]: down | [K]: up",
+        View::WordLists => match &state.word_list_state {
+            WordListState::List(_) => "[Enter]: select | [J]: down | [K]: up | [D]: delete",
+            WordListState::Opened(_) => "[ESC]: overview | [Enter]: filter | [J]: down | [K]: up, | [E]: export",
+        }
         View::Exit => "EXITING",
     };
     let paragraph = Paragraph::new(text)
