@@ -51,6 +51,10 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
                     }
                     KeyCode::Char('3') => {
                         state.current_view = View::WordLists;
+                        if matches!(state.word_list_state, WordListState::List(_)) {
+                            state.word_list_state =
+                                WordListState::init(state.db_connection.clone())?;
+                        }
                         return Ok(state);
                     }
                     _ => {}
@@ -128,7 +132,13 @@ pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<S
         View::WordLists => {
             state.word_list_state = match state.word_list_state {
                 WordListState::List(lists_state) => {
-                    handle_event_word_lists(key_event, lists_state, state.db_connection.clone())?
+                    let (new_state, action) = handle_event_word_lists(
+                        key_event,
+                        lists_state,
+                        state.db_connection.clone(),
+                    )?;
+                    update_action_log(&mut state.action_log, action);
+                    new_state
                 }
                 WordListState::Opened(opened_state) => handle_event_word_list_opened(
                     key_event,

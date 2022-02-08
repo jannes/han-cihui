@@ -1,6 +1,7 @@
 use crate::{
     analysis::get_filtered_extraction_items,
     db::word_lists::db_wlist_insert,
+    extraction::ExtractionItem,
     tui::state::analysis::{AnalysisState, ExtractedState},
     word_lists::construct_word_list,
 };
@@ -9,7 +10,10 @@ use crossterm::event;
 use crossterm::event::KeyCode;
 use event::KeyEvent;
 use rusqlite::Connection;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+};
 
 pub fn handle_event_analysis(
     mut extracted_state: Box<ExtractedState>,
@@ -23,12 +27,15 @@ pub fn handle_event_analysis(
         KeyCode::Char('s') => {
             let book = &extracted_state.extraction_result.segmented_book;
             let analysis_query = extracted_state.analysis_query;
-            let unknown_words_to_save = get_filtered_extraction_items(
+            let unknown_words_to_save: HashSet<&ExtractionItem> = get_filtered_extraction_items(
                 &extracted_state.extraction_result,
                 analysis_query.min_occurrence_words,
                 &extracted_state.known_words_and_chars,
                 analysis_query.min_occurrence_unknown_chars,
-            );
+            )
+            .into_iter()
+            .filter(|item| !extracted_state.known_words_and_chars.contains(&item.word))
+            .collect();
             let word_list = construct_word_list(book, analysis_query, &unknown_words_to_save);
             db_wlist_insert(&db.lock().unwrap(), word_list)
                 .context("unable to save word list to DB")?;

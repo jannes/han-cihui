@@ -22,6 +22,10 @@ const SELECT_WORD_LIST_QUERY: &str = "
 SELECT (word_list_json)
 FROM word_lists WHERE id = ?1";
 
+const DELETE_WORD_LIST_QUERY: &str = "
+DELETE FROM word_lists
+WHERE id = ?1";
+
 pub fn db_wlist_insert(conn: &Connection, word_list: WordList) -> Result<()> {
     let book_name = word_list.metadata.book_name;
     let author_name = word_list.metadata.author_name;
@@ -86,4 +90,9 @@ pub fn db_wlist_select_by_id(
         .next()
         .transpose()?;
     Ok(res)
+}
+
+pub fn db_wlist_delete_by_id(conn: &Connection, word_list_id: i64) -> Result<()> {
+    conn.execute(DELETE_WORD_LIST_QUERY, params![word_list_id])?;
+    Ok(())
 }

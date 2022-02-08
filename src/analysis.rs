@@ -4,7 +4,7 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 
-#[derive(Hash, PartialEq, Eq, Clone, Copy)]
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct AnalysisQuery {
     pub min_occurrence_words: u64,
     pub min_occurrence_unknown_chars: Option<u64>,

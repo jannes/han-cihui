@@ -1,5 +1,6 @@
 use std::sync::{Arc, Mutex};
 
+use crate::db::word_lists::db_wlist_delete_by_id;
 use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListState};
 use anyhow::Result;
 
@@ -12,10 +13,10 @@ pub fn handle_event_word_lists(
     key_event: KeyEvent,
     mut state: ListOfWordLists,
     db_conn: Arc<Mutex<Connection>>,
-) -> Result<WordListState> {
+) -> Result<(WordListState, Option<String>)> {
     match key_event.code {
         KeyCode::Enter => {
-            return state.try_open(&db_conn.lock().unwrap());
+            return Ok((state.try_open(&db_conn.lock().unwrap())?, None));
         }
         KeyCode::Char('j') => {
             state.select_next();
@@ -24,11 +25,17 @@ pub fn handle_event_word_lists(
             state.select_previous();
         }
         KeyCode::Char('d') => {
-            todo!()
+            if let Some(wlm) = state.remove_current() {
+                let action = match db_wlist_delete_by_id(&db_conn.lock().unwrap(), wlm.id) {
+                    Ok(_) => Some(format!("deleted wlist for {}", wlm.book_name)),
+                    Err(e) => Some(format!("deletion failed, err: {:?}", e)),
+                };
+                return Ok((WordListState::List(state), action));
+            };
         }
         _ => {}
     }
-    Ok(WordListState::List(state))
+    Ok((WordListState::List(state), None))
 }
 
 pub fn handle_event_word_list_opened(

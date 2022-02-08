@@ -88,6 +88,27 @@ impl ListOfWordLists {
             None => Ok(WordListState::List(self)),
         }
     }
+
+    pub fn remove_current(&mut self) -> Option<WordListMetadata> {
+        let (to_select, wlm) = match self.table_state.borrow().selected() {
+            Some(i) => {
+                let wlm = self.word_lists.remove(i);
+                let index = if i >= self.word_lists.len() {
+                    if i == 0 {
+                        None
+                    } else {
+                        Some(i - 1)
+                    }
+                } else {
+                    Some(i)
+                };
+                (index, Some(wlm))
+            }
+            None => (None, None),
+        };
+        self.table_state.borrow_mut().select(to_select);
+        wlm
+    }
 }
 
 pub struct OpenedWordList {
