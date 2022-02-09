@@ -120,20 +120,6 @@ pub fn db_words_select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
     Ok(vocab?.into_iter().collect())
 }
 
-pub fn db_words_select_by_status(
-    conn: &Connection,
-    status: VocabStatus,
-) -> Result<HashSet<String>> {
-    let mut stmt = conn.prepare(&format!(
-        "SELECT (word) FROM words WHERE status = {}",
-        status.to_i64()
-    ))?;
-    let known_words = stmt
-        .query_map([], |row| row.get(0))?
-        .collect::<Result<HashSet<String>, _>>()?;
-    Ok(known_words)
-}
-
 pub fn db_words_select_known(conn: &Connection) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status != {}",

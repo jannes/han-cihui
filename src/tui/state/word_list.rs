@@ -136,6 +136,10 @@ impl OpenedWordList {
         &self.chapter_infos
     }
 
+    pub fn get_selected_mut(&mut self) -> Option<&mut WLChapterInfo> {
+        todo!()
+    }
+
     pub fn select_next(&mut self) {
         if self.chapter_infos.is_empty() {
             return;

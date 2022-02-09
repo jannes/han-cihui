@@ -45,7 +45,9 @@ pub fn handle_event_word_list_opened(
 ) -> Result<WordListState> {
     match key_event.code {
         KeyCode::Enter => {
-            todo!()
+            if let Some(selected_chapter) = state.get_selected_mut() {
+                selected_chapter.modify_tw(|tagged_words| todo!());
+            }
         }
         KeyCode::Esc => {
             return WordListState::init(db);
@@ -56,7 +58,7 @@ pub fn handle_event_word_list_opened(
         KeyCode::Char('k') => {
             state.select_previous();
         }
-        KeyCode::Char('s') => {
+        KeyCode::Char('e') => {
             todo!()
         }
         _ => {}
