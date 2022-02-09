@@ -149,6 +149,17 @@ mod tests {
     }
 
     #[test]
+    fn flatten_book_depth_2() {
+        let book = get_example_book();
+        let flattened = flatten_book(&book, 2);
+        assert_eq!(flattened.chapters.len(), 3);
+        let chapter1 = flattened.chapters.get(0).unwrap();
+        let chapter2 = flattened.chapters.get(1).unwrap();
+        assert!(chapter1.content.ends_with("1 text"));
+        assert!(chapter2.content.ends_with("1.1.1 text"));
+    }
+
+    #[test]
     fn book_to_json() {
         let chapter = FlatChapter {
             title: "一".to_string(),

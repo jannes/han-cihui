@@ -6,16 +6,18 @@ extern crate rusqlite;
 use crate::tui::state::State;
 use crate::tui::TuiApp;
 use cli::{get_arg_matches, perform_add_external, perform_delete_external};
+use config::get_data_dir;
 use db::vocab::AddedExternal;
 use rusqlite::Connection;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::{env, fs};
 
 use anyhow::Result;
 
 mod analysis;
 mod cli;
+mod config;
 mod db;
 mod ebook;
 mod extraction;
@@ -35,23 +37,6 @@ macro_rules! get_db {
             .as_ref()
             .expect("connection not initialized yet!")
     };
-}
-
-#[cfg(not(debug_assertions))]
-const DATA_DIR: &str = "/Users/jannes/.han-cihui";
-
-// making sure that when developing the path to the data directory has to be explicitely set
-#[cfg(debug_assertions)]
-fn get_data_dir() -> String {
-    env::var("DATA_DIR").expect("always pass DATA_DIR env var when developing")
-}
-
-#[cfg(not(debug_assertions))]
-fn get_data_dir() -> String {
-    match env::var("DATA_DIR") {
-        Ok(s) => s,
-        Err(_) => DATA_DIR.to_string(),
-    }
 }
 
 mod embedded {

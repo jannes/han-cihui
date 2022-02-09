@@ -8,15 +8,12 @@ use std::{
     convert::TryInto,
 };
 
+use crate::config::{
+    ANKIDB_PATH, ANKI_NOTE_FIELD_PAIRS, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG,
+    ANKI_WORD_DELIMITERS,
+};
+
 use super::vocab::{db_words_insert_overwrite, Vocab, VocabStatus};
-
-pub const ANKIDB_PATH: &str =
-    "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
-const WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
-const NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
-
-pub const SUSPENDED_KNOWN_FLAG: i32 = 3; // green
-pub const SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum NoteStatus {
@@ -33,7 +30,7 @@ pub struct ZhNote {
 
 pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     let conn = Connection::open(ANKIDB_PATH)?;
-    let note_field_map: HashMap<&str, &str> = NOTE_FIELD_PAIRS.iter().cloned().collect();
+    let note_field_map: HashMap<&str, &str> = ANKI_NOTE_FIELD_PAIRS.iter().cloned().collect();
     let zh_notes = get_zh_notes(&conn, &note_field_map)?;
     let anki_vocab: Vec<Vocab> = zh_notes
         .iter()
@@ -81,7 +78,7 @@ const SELECT_NOTETYPES_SQL: &str = "SELECT notetypes.id, notetypes.name, FIELDS.
 
 fn zh_field_to_words(field: &str) -> Vec<String> {
     field
-        .split(&WORD_DELIMITERS[..])
+        .split(&ANKI_WORD_DELIMITERS[..])
         .map(String::from)
         .collect()
 }
@@ -139,12 +136,12 @@ fn select_notes(
         }
         NoteStatus::SuspendedUnknown => {
             let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, SUSPENDED_UNKNOWN_FLAG];
+            let params = params![note_type_id, ANKI_SUSPENDED_UNKNOWN_FLAG];
             stmt_to_result(stmt, status, params)
         }
         NoteStatus::SuspendedKnown => {
             let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, SUSPENDED_KNOWN_FLAG];
+            let params = params![note_type_id, ANKI_SUSPENDED_KNOWN_FLAG];
             stmt_to_result(stmt, status, params)
         }
     }
