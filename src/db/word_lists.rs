@@ -14,6 +14,11 @@ INSERT INTO word_lists
 (book_name, author_name, create_time, min_occurrence_words, min_occurrence_chars, word_list_json)
 VALUES (?1, ?2, strftime('%s', 'now'), ?3, ?4, ?5)";
 
+const UPDATE_WORD_LIST_QUERY: &str = "
+UPDATE word_lists
+SET word_list_json = ?1
+WHERE id = ?2";
+
 const SELECT_ALL_WORD_LISTS_QUERY: &str = "
 SELECT id, book_name, author_name, create_time, min_occurrence_words, min_occurrence_chars
 FROM word_lists";
@@ -46,6 +51,13 @@ pub fn db_wlist_insert(conn: &Connection, word_list: WordList) -> Result<()> {
             word_list_json
         ],
     )?;
+    Ok(())
+}
+
+pub fn db_wlist_update(conn: &Connection, id: i64, chapter_words: &[&ChapterWords]) -> Result<()> {
+    let word_list_json =
+        serde_json::to_string(chapter_words).expect("failed to serialize words per chapter lists");
+    conn.execute(UPDATE_WORD_LIST_QUERY, params![word_list_json, id])?;
     Ok(())
 }
 

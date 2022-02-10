@@ -176,6 +176,17 @@ impl OpenedWordList {
         };
         self.table_state.borrow_mut().select(Some(i));
     }
+
+    pub fn word_list_id(&self) -> i64 {
+        self.metadata.id
+    }
+
+    pub fn get_chapter_words(&self) -> Vec<&ChapterWords> {
+        self.chapter_infos
+            .iter()
+            .map(|ci| &ci.chapter_words)
+            .collect()
+    }
 }
 
 pub struct WLChapterInfo {
@@ -197,6 +208,10 @@ impl WLChapterInfo {
 
     pub fn chapter_title(&self) -> &str {
         &self.chapter_words.chapter_name
+    }
+
+    pub fn chapter_words(&self) -> &ChapterWords {
+        &self.chapter_words
     }
 
     pub fn is_filtered(&self) -> bool {

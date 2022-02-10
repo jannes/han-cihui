@@ -7,8 +7,9 @@ use crate::word_lists::{Category, TaggedWord};
 slint::include_modules!();
 
 pub fn tag_words(words: &mut Vec<TaggedWord>) {
+    let state = State::new(words);
+    let state = Rc::new(RefCell::new(state));
     // construct state and ui
-    let state = Rc::new(RefCell::new(State::new(words)));
     let ui = AppWindow::new();
     let current_word = state.borrow().current_word().unwrap();
     ui.set_current_word(current_word.into());
@@ -34,6 +35,7 @@ pub fn tag_words(words: &mut Vec<TaggedWord>) {
         }
     };
 
+    let ui_weak = ui.as_weak();
     // link key press to update closure, register close events
     ui.on_key_event(move |k| match k.as_str() {
         "j" => apply_cmd(Command::Tag(Category::Learn)),
@@ -41,7 +43,10 @@ pub fn tag_words(words: &mut Vec<TaggedWord>) {
         "l" => apply_cmd(Command::Tag(Category::Ignore)),
         "u" => apply_cmd(Command::Undo),
         "\u{1b}" => quit_event_loop(), // ESC
-        "\n" => quit_event_loop(),     // Enter
+        "\n" => {
+            ui_weak.unwrap().hide();
+            quit_event_loop();
+        } // Enter
         _ => {}
     });
 

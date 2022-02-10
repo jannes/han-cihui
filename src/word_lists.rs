@@ -21,7 +21,7 @@ pub struct WordList {
     pub words_per_chapter: Vec<ChapterWords>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ChapterWords {
     pub chapter_name: String,
     pub tagged_words: Vec<TaggedWord>,
