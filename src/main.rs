@@ -22,6 +22,7 @@ mod db;
 mod ebook;
 mod extraction;
 mod segmentation;
+mod tagging;
 mod tui;
 mod vocabulary;
 mod word_lists;

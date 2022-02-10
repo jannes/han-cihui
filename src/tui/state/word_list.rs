@@ -137,7 +137,10 @@ impl OpenedWordList {
     }
 
     pub fn get_selected_mut(&mut self) -> Option<&mut WLChapterInfo> {
-        todo!()
+        if let Some(i) = self.table_state.borrow().selected() {
+            return self.chapter_infos.get_mut(i);
+        }
+        None
     }
 
     pub fn select_next(&mut self) {

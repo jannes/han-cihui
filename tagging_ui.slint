@@ -1,0 +1,37 @@
+import { Button, VerticalBox } from "std-widgets.slint";
+import "./Kaiti.ttf";
+
+export AppWindow := Window {
+    width: 700px;
+    height: 300px;
+    no-frame: true;
+    forward-focus: area;
+    
+    property <string> current-word;
+    property <string> footer;
+    callback key-event(string);
+
+    area:= FocusScope { 
+        key-pressed(event) => {
+            root.key-event(event.text);
+            accept
+        }
+        VerticalLayout {  
+            t:= Text {
+                vertical-stretch: 1;
+                width: 700px;
+                font-family: "KaiTi";
+                font-size: 100px;
+                horizontal-alignment: center;
+                text: root.current-word;
+            }
+            Text {
+                vertical-stretch: 0;
+                width: 700px;
+                font-size: 16px;
+                horizontal-alignment: center;
+                text: root.footer;
+            }
+        }
+    }
+}

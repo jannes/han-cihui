@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use crate::db::word_lists::db_wlist_delete_by_id;
+use crate::tagging::tag_words;
 use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListState};
 use anyhow::Result;
 
@@ -46,7 +47,7 @@ pub fn handle_event_word_list_opened(
     match key_event.code {
         KeyCode::Enter => {
             if let Some(selected_chapter) = state.get_selected_mut() {
-                selected_chapter.modify_tw(|tagged_words| todo!());
+                selected_chapter.modify_tw(tag_words)
             }
         }
         KeyCode::Esc => {
