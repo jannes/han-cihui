@@ -2,11 +2,12 @@ use crate::config::{TAGGER_BIN, TAGGING_SOCKET_PATH};
 use crate::extraction::ExtractionItem;
 use crate::segmentation::BookSegmentation;
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::io::Write;
-use std::os::unix::net::UnixStream;
+use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::process::Command;
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
@@ -108,13 +109,27 @@ pub fn construct_word_list(
 }
 
 pub fn tag_words(words: &mut Vec<TaggedWord>) {
+    let socket = Path::new(TAGGING_SOCKET_PATH);
+    if socket.exists() {
+        dbg!("removing old sock");
+        fs::remove_file(&socket).unwrap();
+    }
+    dbg!("binding sock");
+    let listener = UnixListener::bind(socket).expect("could not bind to socket");
+    dbg!("bound sock");
+
     let _c = Command::new(TAGGER_BIN)
         .spawn()
         .expect("could not spawn han-shaixuan");
-    thread::sleep(Duration::from_millis(500));
-    dbg!("done sleeping");
+    dbg!("spawned tagger");
 
-    let mut stream = UnixStream::connect(TAGGING_SOCKET_PATH).expect("could not open stream");
+    let mut stream = listener
+        .incoming()
+        .next()
+        .expect("got none")
+        .expect("could not get conn stream");
+    dbg!("accepted conn");
+
     let words_serialized: Vec<u8> = serde_json::to_string(&words)
         .expect("could not serialize words")
         .bytes()

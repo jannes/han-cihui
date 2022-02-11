@@ -1,7 +1,5 @@
-use std::fs;
 use std::io::prelude::*;
-use std::os::unix::net::UnixListener;
-use std::path::Path;
+use std::os::unix::net::UnixStream;
 use std::{cell::RefCell, rc::Rc};
 
 use han_cihui::{
@@ -13,19 +11,8 @@ use slint::quit_event_loop;
 slint::include_modules!();
 
 pub fn main() {
-    let socket = Path::new(TAGGING_SOCKET_PATH);
-    if socket.exists() {
-        fs::remove_file(&socket).unwrap();
-    }
-    dbg!("binding sock");
-    let listener = UnixListener::bind(socket).expect("could not bind to socket");
-    dbg!("bound sock");
-    let mut stream = listener
-        .incoming()
-        .next()
-        .expect("got none")
-        .expect("could not get conn stream");
-    dbg!("accepted conn");
+    let mut stream = UnixStream::connect(TAGGING_SOCKET_PATH).expect("could not open stream");
+    dbg!("init conn");
     let mut n: [u8; 4] = [0; 4];
     stream.read_exact(&mut n).expect("could not read n");
     let n = u32::from_be_bytes(n) as usize;
