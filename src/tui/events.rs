@@ -19,7 +19,7 @@ use super::state::analysis::AnalysisState;
 use super::state::books::BooksState;
 use super::state::info::InfoState;
 use super::state::word_list::WordListState;
-use super::state::State;
+use super::state::TuiState;
 use super::state::View;
 
 pub enum Event<I> {
@@ -27,7 +27,7 @@ pub enum Event<I> {
     Tick,
 }
 
-pub(super) fn handle_event(mut state: State, event: Event<KeyEvent>) -> Result<State> {
+pub(super) fn handle_event(mut state: TuiState, event: Event<KeyEvent>) -> Result<TuiState> {
     let key_event = match event {
         Event::Input(key_event) => {
             // handle meta shortcuts only when not currently entering input

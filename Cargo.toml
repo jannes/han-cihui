@@ -5,6 +5,18 @@ name = "han-cihui"
 version = "0.1.0"
 build = "build.rs"
 
+[lib]
+name = "han_cihui"
+path = "src/lib.rs"
+
+[[bin]]
+name = "han-cihui"
+path = "src/main.rs"
+
+[[bin]]
+name = "han-shaixuan"
+path = "src/tagger/main.rs"
+
 [dependencies]
 anyhow = "1.0.32"
 clap = "2.33.1"

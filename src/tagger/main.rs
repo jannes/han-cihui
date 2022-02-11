@@ -1,10 +1,46 @@
+use std::fs;
+use std::io::prelude::*;
+use std::os::unix::net::UnixListener;
+use std::path::Path;
 use std::{cell::RefCell, rc::Rc};
 
+use han_cihui::{
+    config::TAGGING_SOCKET_PATH,
+    word_lists::{Category, TaggedWord},
+};
 use slint::quit_event_loop;
 
-use crate::word_lists::{Category, TaggedWord};
-
 slint::include_modules!();
+
+pub fn main() {
+    let socket = Path::new(TAGGING_SOCKET_PATH);
+    if socket.exists() {
+        fs::remove_file(&socket).unwrap();
+    }
+    dbg!("binding sock");
+    let listener = UnixListener::bind(socket).expect("could not bind to socket");
+    dbg!("bound sock");
+    let mut stream = listener
+        .incoming()
+        .next()
+        .expect("got none")
+        .expect("could not get conn stream");
+    dbg!("accepted conn");
+    let mut n: [u8; 4] = [0; 4];
+    stream.read_exact(&mut n).expect("could not read n");
+    let n = u32::from_be_bytes(n) as usize;
+
+    let mut words_serialized: Vec<u8> = vec![0; n];
+    stream
+        .read_exact(&mut words_serialized[0..n])
+        .expect("could not read words");
+    let mut words: Vec<TaggedWord> =
+        serde_json::from_slice(&words_serialized).expect("could not deserialize");
+
+    tag_words(&mut words);
+
+    serde_json::to_writer(stream, &words).expect("could not write into stream");
+}
 
 pub fn tag_words(words: &mut Vec<TaggedWord>) {
     let state = State::new(words);

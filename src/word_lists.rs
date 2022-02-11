@@ -1,7 +1,12 @@
+use crate::config::{TAGGER_BIN, TAGGING_SOCKET_PATH};
 use crate::extraction::ExtractionItem;
 use crate::segmentation::BookSegmentation;
 use std::collections::{HashMap, HashSet};
-use std::time::SystemTime;
+use std::io::Write;
+use std::os::unix::net::UnixStream;
+use std::process::Command;
+use std::thread;
+use std::time::{Duration, SystemTime};
 
 use serde::{Deserialize, Serialize};
 
@@ -100,4 +105,30 @@ pub fn construct_word_list(
         metadata,
         words_per_chapter,
     }
+}
+
+pub fn tag_words(words: &mut Vec<TaggedWord>) {
+    let _c = Command::new(TAGGER_BIN)
+        .spawn()
+        .expect("could not spawn han-shaixuan");
+    thread::sleep(Duration::from_millis(500));
+    dbg!("done sleeping");
+
+    let mut stream = UnixStream::connect(TAGGING_SOCKET_PATH).expect("could not open stream");
+    let words_serialized: Vec<u8> = serde_json::to_string(&words)
+        .expect("could not serialize words")
+        .bytes()
+        .collect();
+    let n = words_serialized.len() as u32;
+    let n = n.to_be_bytes();
+    stream
+        .write_all(&n[0..4])
+        .expect("could not write n to stream");
+    stream
+        .write_all(&words_serialized)
+        .expect("could not write words to stream");
+
+    let tagged_words: Vec<TaggedWord> =
+        serde_json::from_reader(stream).expect("could not read/deserialize from stream");
+    *words = tagged_words;
 }

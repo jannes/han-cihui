@@ -10,7 +10,7 @@ use rusqlite::Connection;
 
 use self::{analysis::AnalysisState, books::BooksState, info::InfoState, word_list::WordListState};
 
-pub struct State {
+pub struct TuiState {
     pub analysis_state: AnalysisState,
     pub books_state: BooksState,
     pub info_state: InfoState,
@@ -20,10 +20,10 @@ pub struct State {
     pub action_log: Vec<String>,
 }
 
-impl State {
+impl TuiState {
     pub fn new(db_connection: Connection) -> Result<Self> {
         let db_connection = Arc::new(Mutex::new(db_connection));
-        Ok(State {
+        Ok(TuiState {
             analysis_state: AnalysisState::default(),
             books_state: BooksState::init(db_connection.clone())?,
             info_state: InfoState::init(db_connection.clone())?,

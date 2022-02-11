@@ -1,5 +1,5 @@
 use crate::tui::state::info::{InfoState, SyncingState};
-use crate::tui::state::State;
+use crate::tui::state::TuiState;
 use crate::vocabulary::VocabularyInfo;
 
 use crossterm::event;
@@ -7,7 +7,7 @@ use crossterm::event::KeyCode;
 use event::KeyEvent;
 
 pub fn handle_event_info(
-    state: &State,
+    state: &TuiState,
     current_vocab_info: &VocabularyInfo,
     key_event: KeyEvent,
 ) -> Option<InfoState> {

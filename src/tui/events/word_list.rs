@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex};
 
 use crate::db::word_lists::{db_wlist_delete_by_id, db_wlist_update};
-use crate::tagging::tag_words;
 use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListState};
+use crate::word_lists::tag_words;
 use anyhow::Result;
 
 use crossterm::event;

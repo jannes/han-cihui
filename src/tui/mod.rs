@@ -14,7 +14,7 @@ use std::{io::Stdout, sync::mpsc};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-use self::state::{State, View};
+use self::state::{TuiState, View};
 use self::{
     draw::draw_window,
     events::{handle_event, Event},
@@ -25,11 +25,11 @@ pub struct TuiApp {
     // enables taking out state, passing to handle_event, and putting result back
     // should always be Some(_), except right before & after handle_event call
     // TODO: find more elegant, type-safe way to handle this
-    state: Option<State>,
+    state: Option<TuiState>,
 }
 
 impl TuiApp {
-    pub fn new_stdout(state: State) -> Result<Self> {
+    pub fn new_stdout(state: TuiState) -> Result<Self> {
         let stdout = io::stdout();
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend)?;

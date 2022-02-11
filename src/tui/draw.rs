@@ -30,10 +30,10 @@ use super::state::analysis::AnalysisState;
 use super::state::books::BooksState;
 use super::state::info::InfoState;
 use super::state::word_list::WordListState;
-use super::state::{State, View};
+use super::state::{TuiState, View};
 
 pub(super) fn draw_window(
-    state: &State,
+    state: &TuiState,
     terminal: &mut Terminal<CrosstermBackend<impl Write>>,
 ) -> Result<()> {
     terminal
@@ -70,7 +70,7 @@ pub(super) fn draw_window(
     Ok(())
 }
 
-fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState, area: Rect) {
     match state.current_view {
         View::Analysis => match &state.analysis_state {
             AnalysisState::Blank => {
@@ -115,7 +115,7 @@ fn draw_inner(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, ar
     }
 }
 
-fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState, area: Rect) {
     let tab_titles = vec![
         "Vocabulary [0]".to_string(),
         "Books [1]".to_string(),
@@ -143,7 +143,7 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
     frame.render_widget(tabs, area);
 }
 
-fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState, area: Rect) {
     let text = match state.current_view {
         View::Info => "[S]: sync Anki | [Q]: exit",
         View::Books => "[I]: import new book | [A]: analyze",
@@ -168,7 +168,7 @@ fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, a
     frame.render_widget(paragraph, area);
 }
 
-fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, area: Rect) {
+fn draw_action_log(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState, area: Rect) {
     let action_msgs = state
         .action_log
         .iter()
