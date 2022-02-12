@@ -12,7 +12,6 @@ slint::include_modules!();
 
 pub fn main() {
     let mut stream = UnixStream::connect(TAGGING_SOCKET_PATH).expect("could not open stream");
-    dbg!("init conn");
     let mut n: [u8; 4] = [0; 4];
     stream.read_exact(&mut n).expect("could not read n");
     let n = u32::from_be_bytes(n) as usize;
