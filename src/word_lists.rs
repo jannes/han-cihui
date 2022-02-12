@@ -2,6 +2,7 @@ use crate::config::{TAGGER_BIN, TAGGING_SOCKET_PATH};
 use crate::extraction::ExtractionItem;
 use crate::segmentation::BookSegmentation;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::fs;
 use std::io::Write;
 use std::os::unix::net::UnixListener;
@@ -20,6 +21,20 @@ pub struct WordListMetadata {
     pub author_name: String,
     pub create_time: SystemTime,
     pub analysis_query: AnalysisQuery,
+}
+
+impl Display for WordListMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.author_name.is_empty() {
+            write!(f, "{}_{}", self.book_name, self.analysis_query)
+        } else {
+            write!(
+                f,
+                "{}-{}_{}",
+                self.author_name, self.book_name, self.analysis_query
+            )
+        }
+    }
 }
 
 pub struct WordList {
@@ -66,6 +81,8 @@ pub enum Category {
 // construct word list from book and analysis query/result
 pub fn construct_word_list(
     book: &BookSegmentation,
+    title: &str,
+    author: &str,
     analysis_query: AnalysisQuery,
     unknown_words_to_save: &HashSet<&ExtractionItem>,
 ) -> WordList {
@@ -97,8 +114,8 @@ pub fn construct_word_list(
         .collect();
     let metadata = WordListMetadata {
         id: -1,
-        book_name: book.title_cut.join(""),
-        author_name: "".to_string(),
+        book_name: title.to_string(),
+        author_name: author.to_string(),
         create_time: SystemTime::now(),
         analysis_query,
     };

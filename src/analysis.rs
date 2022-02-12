@@ -2,12 +2,24 @@ use crate::{
     extraction::{word_to_hanzi, ExtractionItem, ExtractionResult},
     vocabulary::get_known_chars,
 };
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub struct AnalysisQuery {
     pub min_occurrence_words: u64,
     pub min_occurrence_unknown_chars: Option<u64>,
+}
+
+impl Display for AnalysisQuery {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.min_occurrence_unknown_chars {
+            Some(c) => write!(f, "w{}-c{}", self.min_occurrence_words, c),
+            None => write!(f, "w{}", self.min_occurrence_words),
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]

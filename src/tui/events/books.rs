@@ -30,6 +30,8 @@ pub fn handle_event_books_display(
                 analysis_state = Some(AnalysisState::Extracted(Box::new(ExtractedState::new(
                     extraction_result,
                     known_words_and_chars,
+                    &book.title,
+                    &book.author,
                 ))));
                 action = Some(format!("open {} for analysis", book.title));
             };

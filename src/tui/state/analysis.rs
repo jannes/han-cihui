@@ -20,12 +20,16 @@ pub struct ExtractedState {
     pub analysis_query: AnalysisQuery,
     pub analysis_infos: HashMap<AnalysisQuery, AnalysisInfo>,
     pub known_words_and_chars: HashSet<String>,
+    pub book_title: String,
+    pub book_author: String,
 }
 
 impl ExtractedState {
     pub fn new(
         extraction_result: ExtractionResult,
         known_words_and_chars: HashSet<String>,
+        book_title: &str,
+        book_author: &str,
     ) -> Self {
         let query_all = AnalysisQuery {
             min_occurrence_words: 1,
@@ -57,6 +61,8 @@ impl ExtractedState {
             analysis_query: query_min3,
             analysis_infos,
             known_words_and_chars,
+            book_title: book_title.to_string(),
+            book_author: book_author.to_string(),
         }
     }
 

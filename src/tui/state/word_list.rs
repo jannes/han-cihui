@@ -136,9 +136,16 @@ impl OpenedWordList {
         &self.chapter_infos
     }
 
-    pub fn get_selected_mut(&mut self) -> Option<&mut WLChapterInfo> {
+    pub fn get_selected_mut(&mut self) -> Option<(usize, &mut WLChapterInfo)> {
         if let Some(i) = self.table_state.borrow().selected() {
-            return self.chapter_infos.get_mut(i);
+            return self.chapter_infos.get_mut(i).map(|ci| (i, ci));
+        }
+        None
+    }
+
+    pub fn get_selected(&self) -> Option<(usize, &WLChapterInfo)> {
+        if let Some(i) = self.table_state.borrow().selected() {
+            return self.chapter_infos.get(i).map(|ci| (i, ci));
         }
         None
     }
@@ -179,6 +186,10 @@ impl OpenedWordList {
 
     pub fn word_list_id(&self) -> i64 {
         self.metadata.id
+    }
+
+    pub fn word_list_metadata(&self) -> &WordListMetadata {
+        &self.metadata
     }
 
     pub fn get_chapter_words(&self) -> Vec<&ChapterWords> {
@@ -224,6 +235,20 @@ impl WLChapterInfo {
 
     pub fn words_to_learn(&self) -> usize {
         self.words_to_learn
+    }
+
+    pub fn get_words_to_learn(&self) -> Vec<&str> {
+        self.chapter_words
+            .tagged_words
+            .iter()
+            .filter_map(|tw| {
+                if matches!(tw.category, Some(Category::Learn)) {
+                    Some(tw.word.as_str())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub fn modify_tw(&mut self, f: impl Fn(&mut Vec<TaggedWord>)) {

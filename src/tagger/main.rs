@@ -89,9 +89,9 @@ enum Command {
 }
 
 impl State {
-    fn new(words: &Vec<TaggedWord>) -> Self {
+    fn new(words: &[TaggedWord]) -> Self {
         Self {
-            words: words.clone(),
+            words: words.to_owned(),
             index: 0,
         }
     }

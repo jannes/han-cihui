@@ -140,11 +140,15 @@ pub(super) fn handle_event(mut state: TuiState, event: Event<KeyEvent>) -> Resul
                     update_action_log(&mut state.action_log, action);
                     new_state
                 }
-                WordListState::Opened(opened_state) => handle_event_word_list_opened(
-                    key_event,
-                    opened_state,
-                    state.db_connection.clone(),
-                )?,
+                WordListState::Opened(opened_state) => {
+                    let (new_state, action) = handle_event_word_list_opened(
+                        key_event,
+                        opened_state,
+                        state.db_connection.clone(),
+                    )?;
+                    update_action_log(&mut state.action_log, action);
+                    new_state
+                }
             };
         }
         View::Books => {
