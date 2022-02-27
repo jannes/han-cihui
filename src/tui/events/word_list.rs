@@ -52,6 +52,7 @@ pub fn handle_event_word_list_opened(
         KeyCode::Enter => {
             if let Some((_, selected_chapter)) = state.get_selected_mut() {
                 selected_chapter.modify_tw(tag_words);
+                state.sync();
                 db_wlist_update(
                     &db.lock().unwrap(),
                     state.word_list_id(),

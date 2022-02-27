@@ -111,23 +111,59 @@ impl ListOfWordLists {
     }
 }
 
+pub struct WordListSummary {
+    pub total: usize,
+    pub filtered: usize,
+    pub to_learn: usize,
+    pub to_not_learn: usize,
+    pub to_ignore: usize,
+}
+
+impl WordListSummary {
+    pub fn new(chapter_infos: &[WLChapterInfo]) -> Self {
+        let mut total = 0;
+        let mut to_learn = 0;
+        let mut to_not_learn = 0;
+        let mut to_ignore = 0;
+
+        for ch in chapter_infos {
+            total += ch.words_total();
+            to_learn += ch.words_to_learn();
+            to_not_learn += ch.words_to_not_learn();
+            to_ignore += ch.words_to_ignore();
+        }
+        let filtered = to_learn + to_not_learn + to_ignore;
+
+        Self {
+            total,
+            filtered,
+            to_learn,
+            to_not_learn,
+            to_ignore,
+        }
+    }
+}
+
 pub struct OpenedWordList {
     metadata: WordListMetadata,
     chapter_infos: Vec<WLChapterInfo>,
+    summary: WordListSummary,
     pub table_state: RefCell<TableState>,
 }
 
 impl OpenedWordList {
     pub fn new(wl: WordList) -> Self {
         let metadata = wl.metadata;
-        let chapter_infos = wl
+        let chapter_infos: Vec<WLChapterInfo> = wl
             .words_per_chapter
             .into_iter()
             .map(WLChapterInfo::new)
             .collect();
+        let summary = WordListSummary::new(&chapter_infos);
         Self {
             metadata,
             chapter_infos,
+            summary,
             table_state: RefCell::new(TableState::default()),
         }
     }
@@ -136,11 +172,19 @@ impl OpenedWordList {
         &self.chapter_infos
     }
 
+    pub fn summary(&self) -> &WordListSummary {
+        &self.summary
+    }
+
     pub fn get_selected_mut(&mut self) -> Option<(usize, &mut WLChapterInfo)> {
         if let Some(i) = self.table_state.borrow().selected() {
             return self.chapter_infos.get_mut(i).map(|ci| (i, ci));
         }
         None
+    }
+
+    pub fn sync(&mut self) {
+        self.summary = WordListSummary::new(&self.chapter_infos);
     }
 
     pub fn get_selected(&self) -> Option<(usize, &WLChapterInfo)> {
@@ -203,6 +247,8 @@ impl OpenedWordList {
 pub struct WLChapterInfo {
     chapter_words: ChapterWords,
     words_to_learn: usize,
+    words_to_not_learn: usize,
+    words_to_ignore: usize,
     filtered: bool,
 }
 
@@ -211,6 +257,8 @@ impl WLChapterInfo {
         let mut res = Self {
             chapter_words: cw,
             words_to_learn: 0,
+            words_to_not_learn: 0,
+            words_to_ignore: 0,
             filtered: false,
         };
         res.update_status();
@@ -237,6 +285,14 @@ impl WLChapterInfo {
         self.words_to_learn
     }
 
+    pub fn words_to_not_learn(&self) -> usize {
+        self.words_to_not_learn
+    }
+
+    pub fn words_to_ignore(&self) -> usize {
+        self.words_to_ignore
+    }
+
     pub fn get_words_to_learn(&self) -> Vec<&str> {
         self.chapter_words
             .tagged_words
@@ -259,14 +315,22 @@ impl WLChapterInfo {
     fn update_status(&mut self) {
         self.filtered = true;
         self.words_to_learn = 0;
-        self.chapter_words.tagged_words.iter().for_each(|tw| {
-            if let Some(cat) = tw.category {
-                if let Category::Learn = cat {
+        self.chapter_words
+            .tagged_words
+            .iter()
+            .for_each(|tw| match tw.category {
+                Some(Category::Learn) => {
                     self.words_to_learn += 1;
                 }
-            } else {
-                self.filtered = false;
-            };
-        });
+                Some(Category::NotLearn) => {
+                    self.words_to_not_learn += 1;
+                }
+                Some(Category::Ignore) => {
+                    self.words_to_ignore += 1;
+                }
+                None => {
+                    self.filtered = false;
+                }
+            });
     }
 }

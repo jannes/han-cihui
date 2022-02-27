@@ -146,14 +146,16 @@ fn draw_header(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState
 fn draw_footer(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &TuiState, area: Rect) {
     let text = match state.current_view {
         View::Info => "[S]: sync Anki | [Q]: exit",
-        View::Books => "[I]: import new book | [A]: analyze",
+        View::Books => "[I]: import new book | [Enter]: analyze",
         View::Analysis => {
-            "[J]: - word occ | [K]: + word occ | [H]: - char occ | [L]: + char occ | [S]: save | [R]: reset"
+            "[J]: - #word | [K]: + #word | [H]: - #char | [L]: + #char | [S]: save | [R]: reset"
         }
         View::WordLists => match &state.word_list_state {
             WordListState::List(_) => "[Enter]: select | [J]: down | [K]: up | [D]: delete",
-            WordListState::Opened(_) => "[ESC]: overview | [Enter]: filter | [J]: down | [K]: up, | [E]: export",
-        }
+            WordListState::Opened(_) => {
+                "[ESC]: overview | [Enter]: filter | [J]: down | [K]: up, | [E]: export"
+            }
+        },
         View::Exit => "EXITING",
     };
     let paragraph = Paragraph::new(text)

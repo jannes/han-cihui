@@ -2,13 +2,14 @@ use std::io::Write;
 
 use tui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Row, Table},
+    text::Span,
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
     Frame,
 };
 
-use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList};
+use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListSummary};
 
 pub fn draw_word_lists(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
@@ -73,6 +74,13 @@ pub fn draw_opened_word_list(
         ];
         Row::new(cells)
     });
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints([Constraint::Length(3), Constraint::Min(5)].as_ref());
+    let chunks = layout.split(area);
+
+    let summary = get_summary(state.summary());
     let table = Table::new(rows)
         .header(header)
         .block(Block::default().borders(Borders::ALL))
@@ -84,5 +92,13 @@ pub fn draw_opened_word_list(
             Constraint::Percentage(25),
             Constraint::Percentage(25),
         ]);
-    frame.render_stateful_widget(table, area, &mut state.table_state.borrow_mut());
+    frame.render_widget(summary, chunks[0]);
+    frame.render_stateful_widget(table, chunks[1], &mut state.table_state.borrow_mut());
+}
+
+fn get_summary(state: &WordListSummary) -> Paragraph {
+    Paragraph::new(Span::from(format!(
+        "{}/{} filtered | learn: {}, not learn: {}, ignore: {}",
+        state.filtered, state.total, state.to_learn, state.to_not_learn, state.to_ignore
+    )))
 }

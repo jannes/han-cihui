@@ -21,7 +21,7 @@ pub fn handle_event_books_display(
 ) -> (BooksState, Option<AnalysisState>, Option<String>) {
     match key_event.code {
         KeyCode::Char('i') => (BooksState::EnterToImport("".to_string()), None, None),
-        KeyCode::Char('a') => {
+        KeyCode::Enter => {
             let (mut analysis_state, mut action) = (None, None);
             if let (Some(book), known_words_and_chars) =
                 (state.get_current(), state.known_words_and_chars.clone())
