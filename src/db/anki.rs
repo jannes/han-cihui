@@ -8,9 +8,12 @@ use std::{
     convert::TryInto,
 };
 
-use crate::config::{
-    ANKIDB_PATH, ANKI_NOTE_FIELD_PAIRS, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG,
-    ANKI_WORD_DELIMITERS,
+use crate::{
+    config::{
+        ANKIDB_PATH, ANKI_NOTE_FIELD_PAIRS, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG,
+        ANKI_WORD_DELIMITERS,
+    },
+    extraction::contains_hanzi,
 };
 
 use super::vocab::{db_words_insert_overwrite, Vocab, VocabStatus};
@@ -78,7 +81,7 @@ const SELECT_NOTETYPES_SQL: &str = "SELECT notetypes.id, notetypes.name, FIELDS.
 
 fn zh_field_to_words(field: &str) -> Vec<String> {
     field
-        .split(&ANKI_WORD_DELIMITERS[..])
+        .split(|c: char| !contains_hanzi(&c.to_string()) && c != '，')
         .map(String::from)
         .collect()
 }
