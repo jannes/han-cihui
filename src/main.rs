@@ -1,4 +1,4 @@
-use han_cihui::cli::{get_arg_matches, perform_add_external, perform_delete_external};
+use han_cihui::cli::{get_arg_matches, perform_add_external, perform_delete_external, show};
 use han_cihui::config::get_data_dir;
 use han_cihui::db::vocab::AddedExternal;
 use han_cihui::tui::state::TuiState;
@@ -45,6 +45,7 @@ fn main() -> Result<()> {
             let filename = matches.value_of("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Ignored)
         }
+        Some("show") => show(&data_conn),
         _ => TuiApp::new_stdout(TuiState::new(data_conn)?)?.run(),
     }
 }

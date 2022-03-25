@@ -5,7 +5,8 @@ use clap::{App, Arg, ArgMatches, SubCommand};
 use rusqlite::Connection;
 
 use crate::db::vocab::{
-    db_words_add_external, db_words_delete, db_words_select_all, AddedExternal,
+    db_words_add_external, db_words_delete, db_words_select_all, db_words_select_known,
+    AddedExternal,
 };
 
 pub fn get_arg_matches() -> ArgMatches<'static> {
@@ -38,6 +39,7 @@ pub fn get_arg_matches() -> ArgMatches<'static> {
                         .help("path to file with one word per line"),
                 ),
         )
+        .subcommand(SubCommand::with_name("show").about("Prints known words"))
         .get_matches()
 }
 
@@ -75,4 +77,12 @@ pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result
         .collect();
     println!("amount to delete: {}", &words_to_delete.len());
     db_words_delete(data_conn, &words_to_delete)
+}
+
+pub fn show(conn: &Connection) -> Result<()> {
+    let known_words = db_words_select_known(conn)?;
+    for item in known_words {
+        println!("{}", item);
+    }
+    Ok(())
 }
