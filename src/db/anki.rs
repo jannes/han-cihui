@@ -11,7 +11,6 @@ use std::{
 use crate::{
     config::{
         ANKIDB_PATH, ANKI_NOTE_FIELD_PAIRS, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG,
-        ANKI_WORD_DELIMITERS,
     },
     extraction::contains_hanzi,
 };

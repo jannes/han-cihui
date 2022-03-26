@@ -3,7 +3,6 @@ use std::env;
 pub const ANKIDB_PATH: &str =
     "/Users/jannes/Library/ApplicationSupport/Anki2/Jannes/collection.anki2";
 pub const ANKI_NOTE_FIELD_PAIRS: [(&str, &str); 1] = [("中文-英文", "中文")];
-pub const ANKI_WORD_DELIMITERS: [char; 3] = ['/', '\\', ' '];
 pub const ANKI_SUSPENDED_KNOWN_FLAG: i32 = 3; // green
 pub const ANKI_SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
