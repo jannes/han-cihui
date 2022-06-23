@@ -1,4 +1,5 @@
 use crate::ebook::FlatBook;
+use crate::fan2jian;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
@@ -30,7 +31,8 @@ pub fn segment_book(book: &FlatBook, segmentation_mode: SegmentationMode) -> Boo
     let file_path = dir.path().join("tmp-book.json");
     let mut file = File::create(&file_path).expect("expect successful creation of tempfile");
     let book_json = book.as_json();
-    file.write_all(book_json.as_bytes())
+    let book_json_simplified = fan2jian::map_text(&book_json, true);
+    file.write_all(book_json_simplified.as_bytes())
         .expect("expect successful write to tempfile");
     let json_filepath = file_path
         .into_os_string()

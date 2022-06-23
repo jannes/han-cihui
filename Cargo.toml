@@ -26,6 +26,7 @@ anyhow = "1.0.32"
 clap = "2.33.1"
 crossterm = {version = "0.22", features = ["serde"]}
 epubparse = "0.2.2"
+jieba-rs = "0.6"
 lazy_static = "1.4.0"
 refinery = {version = "0.8.2", features = ["rusqlite"]}
 regex = "1.3.9"

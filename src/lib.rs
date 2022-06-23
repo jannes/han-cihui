@@ -7,6 +7,7 @@ pub mod config;
 pub mod db;
 pub mod ebook;
 pub mod extraction;
+pub mod fan2jian;
 pub mod segmentation;
 pub mod tui;
 pub mod vocabulary;
