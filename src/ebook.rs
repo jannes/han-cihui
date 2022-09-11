@@ -34,11 +34,22 @@ impl FlatChapter {
     }
 }
 
-pub fn open_as_flat_book(filename: &str, depth: u32) -> Result<FlatBook> {
+pub fn open_as_flat_book(filename: &str) -> Result<FlatBook> {
     let path_no_escaped_whitespace: String = filename.split('\\').into_iter().collect();
     let path = PathBuf::from(path_no_escaped_whitespace);
     let book = open_epub_as_book(&path)?;
-    Ok(flatten_book(&book, depth))
+    // flatten book such that there will be at least 4 chapters
+    // try with iteratively higher depths
+    let mut depth = 1;
+    let mut flat_book = flatten_book(&book, depth);
+    while depth <= 3 {
+        if flat_book.chapters.len() > 5 {
+            return Ok(flat_book);
+        }
+        depth += 1;
+        flat_book = flatten_book(&book, depth);
+    }
+    Ok(flat_book)
 }
 
 fn open_epub_as_book(filepath: &Path) -> Result<Book> {

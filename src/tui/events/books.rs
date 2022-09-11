@@ -4,7 +4,6 @@ use crossterm::event::{KeyCode, KeyEvent};
 use rusqlite::Connection;
 
 use crate::{
-    config::DEFAULT_CHAPTERS_DEPTH,
     db::books::db_books_delete,
     ebook::open_as_flat_book,
     extraction::extract_vocab_from_segmented,
@@ -74,7 +73,7 @@ pub fn handle_event_books_enter_to_import(
         KeyCode::Esc => {
             return (BooksState::Uninitialized, Some("canceled open".to_string()));
         }
-        KeyCode::Enter => match open_as_flat_book(&partial_path, DEFAULT_CHAPTERS_DEPTH) {
+        KeyCode::Enter => match open_as_flat_book(&partial_path) {
             Ok(b) => {
                 let action = Some(format!("segmenting {} by {}", &b.title, &b.author));
                 return (BooksState::Importing(ImportingState::new(b, db)), action);

@@ -8,8 +8,6 @@ pub const ANKI_SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
 
 pub const EXPORT_BASE_PATH: &str = "/Users/jannes/Nextcloud/中文/小说生词";
 
-pub const DEFAULT_CHAPTERS_DEPTH: u32 = 2;
-
 pub const TAGGING_SOCKET_PATH: &str = "/Users/jannes/.han-cihui/sock";
 #[cfg(not(debug_assertions))]
 pub const TAGGER_BIN: &str = "han-shaixuan";
