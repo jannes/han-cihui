@@ -23,7 +23,7 @@ path = "src/cleanup.rs"
 
 [dependencies]
 anyhow = "1.0.32"
-clap = "2.33.1"
+clap = "4.1"
 crossterm = {version = "0.25", features = ["serde"]}
 epubparse = "0.2.2"
 jieba-rs = "0.6"

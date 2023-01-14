@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fs};
 
 use anyhow::Result;
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{Arg, ArgMatches, Command};
 use rusqlite::Connection;
 
 use crate::db::vocab::{
@@ -9,37 +9,37 @@ use crate::db::vocab::{
     AddedExternal,
 };
 
-pub fn get_arg_matches() -> ArgMatches<'static> {
-    App::new("中文 vocab")
+pub fn get_arg_matches() -> ArgMatches {
+    Command::new("中文 vocab")
         .version("0.1")
         .subcommand(
-            SubCommand::with_name("add")
+            Command::new("add")
                 .about("Adds known vocabulary from file")
                 .arg(
-                    Arg::with_name("filename")
+                    Arg::new("filename")
                         .required(true)
                         .help("path to file with one word per line"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("delete")
+            Command::new("delete")
                 .about("Deletes known vocabulary from file")
                 .arg(
-                    Arg::with_name("filename")
+                    Arg::new("filename")
                         .required(true)
                         .help("path to file with one word per line"),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("add-ignore")
+            Command::new("add-ignore")
                 .about("Adds vocabulary to be ignored from file")
                 .arg(
-                    Arg::with_name("filename")
+                    Arg::new("filename")
                         .required(true)
                         .help("path to file with one word per line"),
                 ),
         )
-        .subcommand(SubCommand::with_name("show").about("Prints known words"))
+        .subcommand(Command::new("show").about("Prints known words"))
         .get_matches()
 }
 

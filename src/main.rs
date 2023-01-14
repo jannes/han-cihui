@@ -32,17 +32,17 @@ fn main() -> Result<()> {
     match matches.subcommand_name() {
         Some("add") => {
             let matches = matches.subcommand_matches("add").unwrap();
-            let filename = matches.value_of("filename").unwrap();
+            let filename = *matches.get_one("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Known)
         }
         Some("delete") => {
             let matches = matches.subcommand_matches("delete").unwrap();
-            let filename = matches.value_of("filename").unwrap();
+            let filename = *matches.get_one("filename").unwrap();
             perform_delete_external(&data_conn, filename)
         }
         Some("add-ignore") => {
             let matches = matches.subcommand_matches("add-ignore").unwrap();
-            let filename = matches.value_of("filename").unwrap();
+            let filename = *matches.get_one("filename").unwrap();
             perform_add_external(&data_conn, filename, AddedExternal::Ignored)
         }
         Some("show") => show(&data_conn),
