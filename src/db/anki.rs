@@ -61,6 +61,9 @@ struct NotetypeField {
     field_order: usize,
 }
 
+// cards.ord refers to card number
+// cards.ord = 0 selects Card 1
+// for 中文-英文 Notetype that is the Chinese->English Card
 const SELECT_ACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
             ON notes.id = cards.nid \
             WHERE notes.mid = ?1 \
