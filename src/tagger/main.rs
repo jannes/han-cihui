@@ -64,11 +64,15 @@ pub fn tag_words(words: &mut Vec<TaggedWord>) {
         "k" => apply_cmd(Command::Tag(Category::NotLearn)),
         "l" => apply_cmd(Command::Tag(Category::Ignore)),
         "u" => apply_cmd(Command::Undo),
-        "\u{1b}" => quit_event_loop(), // ESC
+        // ESC
+        "\u{1b}" => {
+            let _ = quit_event_loop();
+        }
+        // Enter
         "\n" => {
             ui_weak.unwrap().hide();
-            quit_event_loop();
-        } // Enter
+            let _ = quit_event_loop();
+        }
         _ => {}
     });
 
