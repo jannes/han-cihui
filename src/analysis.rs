@@ -95,7 +95,7 @@ pub fn get_analysis_info(
         .sum();
     let char_freq_min_occur: HashMap<String, u64> =
         ext_item_set_to_char_freq(&vocabulary_min_occurring);
-    let total_chars: u64 = char_freq_min_occur.iter().map(|(_char, freq)| freq).sum();
+    let total_chars: u64 = char_freq_min_occur.values().sum();
     let unique_words = vocabulary_min_occurring.len() as u64;
     let unique_chars = char_freq_min_occur.len() as u64;
 
@@ -111,10 +111,7 @@ pub fn get_analysis_info(
         .filter(|(hanzi, _freq)| !known_chars.contains(hanzi.as_str()))
         .map(|(hanzi, freq)| (hanzi, *freq))
         .collect();
-    let unknown_total_chars: u64 = unknown_char_min_occur
-        .iter()
-        .map(|(_char, freq)| freq)
-        .sum();
+    let unknown_total_chars: u64 = unknown_char_min_occur.values().sum();
     let unknown_unique_words = unknown_voc_min_occ.len() as u64;
     let unknown_unique_chars = unknown_char_min_occur.len() as u64;
 

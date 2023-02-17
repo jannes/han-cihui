@@ -107,7 +107,7 @@ fn flatten_book(book: &Book, depth: u32) -> FlatBook {
 
     FlatBook {
         title: book.title.clone(),
-        author: book.author.clone().unwrap_or_else(|| "".to_string()),
+        author: book.author.clone().unwrap_or_default(),
         preface_content: book.preface_content.clone(),
         chapters: flat_chapters,
     }

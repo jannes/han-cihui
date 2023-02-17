@@ -128,7 +128,7 @@ pub fn construct_word_list(
 pub fn tag_words(words: &mut Vec<TaggedWord>) {
     let socket = Path::new(TAGGING_SOCKET_PATH);
     if socket.exists() {
-        fs::remove_file(&socket).unwrap();
+        fs::remove_file(socket).unwrap();
     }
     let listener = UnixListener::bind(socket).expect("could not bind to socket");
 
