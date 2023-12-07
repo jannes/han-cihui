@@ -26,6 +26,7 @@ pub enum NoteStatus {
 pub struct Note {
     pub fields_raw: String,
     pub status: NoteStatus,
+    pub modified_timestamp: i64,
 }
 
 pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
@@ -44,13 +45,17 @@ pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     let mut text_active = String::new();
     let mut text_suspended_known = String::new();
     let mut text_suspended_unknown = String::new();
+    let mut latest_modified = 0;
     for note in zh_notes {
+        latest_modified = std::cmp::max(latest_modified, note.modified_timestamp);
         match note.status {
             NoteStatus::Active => text_active.push_str(&note.fields_raw),
             NoteStatus::SuspendedKnown => text_suspended_known.push_str(&note.fields_raw),
             NoteStatus::SuspendedUnknown => text_suspended_unknown.push_str(&note.fields_raw),
         }
     }
+
+    eprintln!("lastest mod: {latest_modified}");
 
     // extract words from each big text and construct vocab
     // active > suspended known > suspended unknown
@@ -88,13 +93,13 @@ struct Notetype {
 // cards.ord refers to card number
 // cards.ord = 0 selects Card 1
 // for 中文-英文 Notetype that is the Chinese->English Card
-const SELECT_ACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
+const SELECT_ACTIVE_SQL: &str = "SELECT notes.flds, notes.mod FROM notes JOIN cards \
             ON notes.id = cards.nid \
             WHERE notes.mid = ?1 \
             AND cards.queue != -1 \
             AND cards.ord = 0";
 
-const SELECT_INACTIVE_SQL: &str = "SELECT notes.flds FROM notes JOIN cards \
+const SELECT_INACTIVE_SQL: &str = "SELECT notes.flds, notes.mod FROM notes JOIN cards \
             ON notes.id = cards.nid \
             WHERE notes.mid = ?1 \
             AND cards.queue = -1 \
@@ -152,6 +157,7 @@ fn select_notes(
             Ok(Note {
                 fields_raw: row.get(0)?,
                 status,
+                modified_timestamp: row.get(1)?,
             })
         })?
         .collect::<Result<Vec<Note>, _>>()
