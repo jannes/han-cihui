@@ -1,7 +1,7 @@
 extern crate rusqlite;
 extern crate serde_json;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::{Context, Result};
 use jieba_rs::Jieba;
@@ -9,6 +9,7 @@ use rusqlite::{params, Connection, Statement, ToSql};
 
 use crate::{
     config::{get_config, Config, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG},
+    fan2jian::get_mapping,
     segmentation::extract_words,
 };
 
@@ -28,6 +29,7 @@ pub struct Note {
 }
 
 pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
+    let now = Instant::now();
     let Config {
         anki_db_path,
         anki_notes,
@@ -54,16 +56,21 @@ pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
     // active > suspended known > suspended unknown
     // (e.g if word is both in active and unknown note, count as active)
     let jieba = Jieba::new();
+    let fan2jian = get_mapping(true);
+    let jian2fan = get_mapping(false);
     let mut vocab: HashMap<String, VocabStatus> = HashMap::new();
-    for word in extract_words(&text_suspended_unknown, &jieba) {
+
+    for word in extract_words(&text_suspended_unknown, &jieba, &fan2jian, &jian2fan) {
         vocab.insert(word, VocabStatus::SuspendedUnknown);
     }
-    for word in extract_words(&text_suspended_known, &jieba) {
+    for word in extract_words(&text_suspended_known, &jieba, &fan2jian, &jian2fan) {
         vocab.insert(word, VocabStatus::SuspendedKnown);
     }
-    for word in extract_words(&text_active, &jieba) {
+    for word in extract_words(&text_active, &jieba, &fan2jian, &jian2fan) {
         vocab.insert(word, VocabStatus::Active);
     }
+    let duration = now.elapsed();
+    eprintln!("anki sync extraction duration: {duration:#?})");
 
     db_words_insert_overwrite(data_conn, &vocab)
 }

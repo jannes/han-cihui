@@ -1,9 +1,9 @@
 use crate::ebook::FlatBook;
 use crate::extraction::{contains_hanzi, word_to_hanzi};
-use crate::fan2jian::{self, get_mapping};
+use crate::fan2jian::{self};
 use jieba_rs::Jieba;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -88,27 +88,31 @@ pub fn segment_book(book: &FlatBook, segmentation_mode: SegmentationMode) -> Boo
 /// Segments text into list of words
 /// converts from traditional to simplified
 // TODO: improve this terrible implementation
-pub fn extract_words(text: &str, jieba: &Jieba) -> HashSet<String> {
-    let mapping_fan2jian = get_mapping(true);
-    let mapping_jian2fan = get_mapping(false);
+pub fn extract_words(
+    text: &str,
+    jieba: &Jieba,
+    mapping_fan2jian: &HashMap<String, String>,
+    mapping_jian2fan: &HashMap<String, String>,
+) -> HashSet<String> {
     let segmented = jieba.cut(text, false);
-    let mut words = HashSet::with_capacity(segmented.len());
+    // save references first to avoid repetive allocation of duplicates
+    let mut words: HashSet<&str> = HashSet::with_capacity(10_000);
     for chunk in segmented {
         if !contains_hanzi(chunk) {
             continue;
         }
         if let Some(word) = mapping_fan2jian.get(chunk) {
-            words.insert(word.to_owned());
+            words.insert(word);
         } else if mapping_jian2fan.contains_key(chunk) {
-            words.insert(chunk.to_owned());
+            words.insert(chunk);
         } else {
             let hanzis = word_to_hanzi(chunk);
             for hanzi in hanzis {
                 if let Some(hanzi) = mapping_fan2jian.get(hanzi) {
-                    words.insert(hanzi.to_owned());
+                    words.insert(hanzi);
                 }
             }
         }
     }
-    words
+    words.into_iter().map(|w| w.to_owned()).collect()
 }
