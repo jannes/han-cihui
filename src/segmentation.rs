@@ -1,6 +1,9 @@
 use crate::ebook::FlatBook;
-use crate::fan2jian;
+use crate::extraction::{contains_hanzi, word_to_hanzi};
+use crate::fan2jian::{self, get_mapping};
+use jieba_rs::Jieba;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -80,4 +83,32 @@ pub fn segment_book(book: &FlatBook, segmentation_mode: SegmentationMode) -> Boo
 
     serde_json::from_str(output.as_str())
         .expect("expected valid json structure in format of BookSegmentation struct")
+}
+
+/// Segments text into list of words
+/// converts from traditional to simplified
+// TODO: improve this terrible implementation
+pub fn extract_words(text: &str, jieba: &Jieba) -> HashSet<String> {
+    let mapping_fan2jian = get_mapping(true);
+    let mapping_jian2fan = get_mapping(false);
+    let segmented = jieba.cut(text, false);
+    let mut words = HashSet::with_capacity(segmented.len());
+    for chunk in segmented {
+        if !contains_hanzi(chunk) {
+            continue;
+        }
+        if let Some(word) = mapping_fan2jian.get(chunk) {
+            words.insert(word.to_owned());
+        } else if mapping_jian2fan.contains_key(chunk) {
+            words.insert(chunk.to_owned());
+        } else {
+            let hanzis = word_to_hanzi(chunk);
+            for hanzi in hanzis {
+                if let Some(hanzi) = mapping_fan2jian.get(hanzi) {
+                    words.insert(hanzi.to_owned());
+                }
+            }
+        }
+    }
+    words
 }

@@ -2,16 +2,14 @@ use std::io::prelude::*;
 use std::os::unix::net::UnixStream;
 use std::{cell::RefCell, rc::Rc};
 
-use han_cihui::{
-    config::TAGGING_SOCKET_PATH,
-    word_lists::{Category, TaggedWord},
-};
+use han_cihui::config::tagging_socket_path;
+use han_cihui::word_lists::{Category, TaggedWord};
 use slint::quit_event_loop;
 
 slint::include_modules!();
 
 pub fn main() {
-    let mut stream = UnixStream::connect(TAGGING_SOCKET_PATH).expect("could not open stream");
+    let mut stream = UnixStream::connect(tagging_socket_path()).expect("could not open stream");
     let mut n: [u8; 4] = [0; 4];
     stream.read_exact(&mut n).expect("could not read n");
     let n = u32::from_be_bytes(n) as usize;

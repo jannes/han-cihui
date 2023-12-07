@@ -3,8 +3,8 @@ use std::collections::HashMap;
 pub use jieba_rs::Jieba;
 use unicode_segmentation::UnicodeSegmentation;
 
-const F2J_TEXT: &str = include_str!("../1to1_fan-jian.txt");
-const J2F_TEXT: &str = include_str!("../1to1_jian-fan.txt");
+pub const F2J_TEXT: &str = include_str!("../1to1_fan-jian.txt");
+pub const J2F_TEXT: &str = include_str!("../1to1_jian-fan.txt");
 
 pub fn map_text(input_text: &str, fan2jian: bool) -> String {
     let mapping = get_mapping(fan2jian);
@@ -35,7 +35,7 @@ fn map_word(word: &str, mapping: &HashMap<String, String>) -> String {
     }
 }
 
-fn get_mapping(fan2jian: bool) -> HashMap<String, String> {
+pub fn get_mapping(fan2jian: bool) -> HashMap<String, String> {
     let text = if fan2jian { F2J_TEXT } else { J2F_TEXT };
     text.lines()
         .map(|line| {
@@ -47,6 +47,6 @@ fn get_mapping(fan2jian: bool) -> HashMap<String, String> {
         .collect()
 }
 
-fn word_to_hanzi(word: &str) -> Vec<&str> {
+pub fn word_to_hanzi(word: &str) -> Vec<&str> {
     UnicodeSegmentation::graphemes(word, true).collect::<Vec<&str>>()
 }

@@ -1,11 +1,10 @@
 use han_cihui::cli::{get_arg_matches, perform_add_external, perform_delete_external, show};
-use han_cihui::config::get_data_dir;
+use han_cihui::config::{get_data_dir, init_config};
 use han_cihui::db::vocab::AddedExternal;
 use han_cihui::tui::state::TuiState;
 use han_cihui::tui::TuiApp;
 use rusqlite::Connection;
 use std::fs;
-use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
@@ -15,16 +14,17 @@ mod embedded {
 }
 
 fn main() -> Result<()> {
-    let data_dir = PathBuf::from(get_data_dir());
+    let data_dir = get_data_dir();
     if !data_dir.exists() {
-        // if first time call, create data directory
         println!(
             "performing first time setup, creating {}",
             data_dir.display()
         );
         fs::create_dir(&data_dir)?;
     }
-    let db_path: PathBuf = [data_dir.as_path(), Path::new("data.db")].iter().collect();
+    init_config(&data_dir);
+
+    let db_path = data_dir.join("data.db");
     let mut data_conn = Connection::open(db_path)?;
     embedded::migrations::runner().run(&mut data_conn)?;
 

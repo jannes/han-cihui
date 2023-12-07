@@ -1,8 +1,7 @@
 use std::fs;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use crate::config::EXPORT_BASE_PATH;
+use crate::config::get_config;
 use crate::db::word_lists::{db_wlist_delete_by_id, db_wlist_update};
 use crate::tui::state::word_list::{ListOfWordLists, OpenedWordList, WordListState};
 use crate::word_lists::tag_words;
@@ -77,7 +76,8 @@ pub fn handle_event_word_list_opened(
                     .fold("".to_string(), |s, w| format!("{}{}\n", s, w));
                 let chapter_title = chapter_info.chapter_title();
                 let wlist_metadata = state.word_list_metadata();
-                let mut p = PathBuf::from(format!("{}/{}", EXPORT_BASE_PATH, wlist_metadata));
+                let mut p = get_config().export_base_path;
+                p.push(wlist_metadata.to_string());
                 if !p.exists() {
                     fs::create_dir(&p).context("could not create folder")?;
                 }

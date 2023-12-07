@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env,
     path::{Path, PathBuf},
 };
@@ -7,13 +7,13 @@ use std::{
 use anyhow::Result;
 use han_cihui::{
     config::get_data_dir,
-    db::vocab::{db_words_delete, db_words_insert_overwrite, db_words_select_all, Vocab},
+    db::vocab::{db_words_delete, db_words_insert_overwrite, db_words_select_all, VocabStatus},
     extraction::contains_hanzi,
 };
 use rusqlite::Connection;
 
 pub fn main() -> Result<()> {
-    let data_dir = PathBuf::from(get_data_dir());
+    let data_dir = get_data_dir();
     let db_path: PathBuf = [data_dir.as_path(), Path::new("data.db")].iter().collect();
     let data_conn = Connection::open(db_path)?;
     let vocabs = db_words_select_all(&data_conn)?;
@@ -24,7 +24,7 @@ pub fn main() -> Result<()> {
     let mut n_cleaned_mult = 0;
 
     let mut to_delete: HashSet<String> = HashSet::new();
-    let mut to_add: HashSet<Vocab> = HashSet::new();
+    let mut to_add: HashMap<String, VocabStatus> = HashMap::new();
 
     for vocab in vocabs {
         let split: Vec<&str> = vocab
@@ -39,18 +39,12 @@ pub fn main() -> Result<()> {
         } else if split.len() == 1 && split[0].len() < vocab.word.len() {
             to_delete.insert(vocab.word.clone());
             n_cleaned_single += 1;
-            to_add.insert(Vocab {
-                word: split[0].to_string(),
-                status: vocab.status,
-            });
+            to_add.insert(split[0].to_string(), vocab.status);
         } else if split.len() > 1 {
             to_delete.insert(vocab.word.clone());
             n_cleaned_mult += 1;
             for word in split {
-                to_add.insert(Vocab {
-                    word: word.to_string(),
-                    status: vocab.status,
-                });
+                to_add.insert(word.to_string(), vocab.status);
             }
         }
     }
@@ -65,15 +59,14 @@ pub fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() == 1 {
         println!("===== ADDING ======");
-        for v in &to_add {
-            println!("{}", v.word);
+        for word in to_add.keys() {
+            println!("{}", word);
         }
         println!("===== DELETING ======");
         for v in &to_delete {
             println!("{}", v);
         }
     } else if args.len() == 2 && args[1] == "--confirm" {
-        let to_add: Vec<Vocab> = to_add.into_iter().collect();
         println!("insert/overwrite {} words", to_add.len());
         db_words_insert_overwrite(&data_conn, &to_add)?;
         println!("insert/overwrite success");

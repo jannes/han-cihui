@@ -1,4 +1,4 @@
-use crate::config::{TAGGER_BIN, TAGGING_SOCKET_PATH};
+use crate::config::{get_data_dir, tagging_socket_path, TAGGER_BIN};
 use crate::extraction::ExtractionItem;
 use crate::segmentation::BookSegmentation;
 use std::collections::{HashMap, HashSet};
@@ -6,7 +6,6 @@ use std::fmt::Display;
 use std::fs;
 use std::io::Write;
 use std::os::unix::net::UnixListener;
-use std::path::Path;
 use std::process::Command;
 use std::time::SystemTime;
 
@@ -126,13 +125,14 @@ pub fn construct_word_list(
 }
 
 pub fn tag_words(words: &mut Vec<TaggedWord>) {
-    let socket = Path::new(TAGGING_SOCKET_PATH);
+    let socket = tagging_socket_path();
     if socket.exists() {
-        fs::remove_file(socket).unwrap();
+        fs::remove_file(&socket).unwrap();
     }
     let listener = UnixListener::bind(socket).expect("could not bind to socket");
 
     let _c = Command::new(TAGGER_BIN)
+        .env("DATA_DIR", get_data_dir())
         .spawn()
         .expect("could not spawn han-shaixuan");
 

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rusqlite::{params, Connection};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 // vocabulary
 const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed)
@@ -97,10 +97,12 @@ pub fn db_words_delete(conn: &Connection, words: &HashSet<String>) -> Result<()>
     Ok(())
 }
 
-pub fn db_words_insert_overwrite(conn: &Connection, vocab: &[Vocab]) -> Result<()> {
-    for item in vocab {
-        let word = &item.word;
-        let status_int = item.status.to_i64();
+pub fn db_words_insert_overwrite(
+    conn: &Connection,
+    vocab: &HashMap<String, VocabStatus>,
+) -> Result<()> {
+    for (word, status) in vocab {
+        let status_int = status.to_i64();
         conn.execute(OVERWRITE_WORD_QUERY, params![word, status_int])?;
     }
     Ok(())
