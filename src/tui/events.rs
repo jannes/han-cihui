@@ -66,16 +66,25 @@ pub(super) fn handle_event(mut state: TuiState, event: Event<KeyEvent>) -> Resul
             if let InfoState::Syncing(syncing_state) = &mut state.info_state {
                 if let Some(new_state) = syncing_state.update() {
                     // if sync successfully completed, add msg to action log
-                    if let InfoState::Display(display_state) = &new_state {
-                        // since it's newly updated, must have Some(previous_vocab_info)
-                        let (active_words_diff, active_known_chars_diff) = display_state.get_diff_active_words_chars()
+                    match &new_state {
+                        InfoState::Display(display_state) => {
+                            // since it's newly updated, must have Some(previous_vocab_info)
+                            let (active_words_diff, active_known_chars_diff) = display_state.get_diff_active_words_chars()
                             .expect("newly synced display state should have Some(previous_vocab_info) field");
-                        state.action_log.push(format!(
-                            "synced Anki: {} new words, {} new chars",
-                            active_words_diff, active_known_chars_diff
-                        ));
-                        state.info_state = new_state;
+                            state.action_log.push(format!(
+                                "synced Anki: {} new words, {} new chars",
+                                active_words_diff, active_known_chars_diff
+                            ));
+                        }
+                        InfoState::SyncError(sync_error_state) => {
+                            update_action_log(
+                                &mut state.action_log,
+                                Some(sync_error_state.error_msg.clone()),
+                            );
+                        }
+                        InfoState::Syncing(_) => {}
                     }
+                    state.info_state = new_state;
                 }
             }
             match &mut state.books_state {
@@ -120,7 +129,7 @@ pub(super) fn handle_event(mut state: TuiState, event: Event<KeyEvent>) -> Resul
                     handle_event_info(&state, &display_state.vocab_info, key_event)
                 }
                 InfoState::SyncError(sync_error_state) => {
-                    // TODO: switch back to display state if no new state comes up + append error msg to action log
+                    // switch back to display state
                     handle_event_info(&state, &sync_error_state.previous_vocab_info, key_event)
                 }
             };
