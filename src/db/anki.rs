@@ -71,7 +71,7 @@ pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
         Connection::open_with_flags(anki_db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
 
     // get latest modification time from previous sync and all note data from Anki DB
-    let current_latest_mod = select_max_modified(&data_conn)?;
+    let current_latest_mod = select_max_modified(data_conn)?;
     let all_notes = get_zh_notes(&conn, anki_notes).context("failed to select notes")?;
 
     let jieba = Jieba::new();
@@ -122,7 +122,7 @@ pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
     eprintln!("anki sync extraction duration: {duration:#?}");
     eprintln!("modified vocab len: {}", mod_vocab.len());
 
-    if mod_vocab.len() > 0 {
+    if !mod_vocab.is_empty() {
         let start_insert = Instant::now();
         db_words_insert_overwrite(data_conn, &mod_vocab, Some(new_latest_mod))?;
         let duration = start_insert.elapsed();
@@ -188,8 +188,7 @@ fn get_zh_notetypes(conn: &Connection, zh_notetype_names: Vec<String>) -> Result
 
 fn select_notes(conn: &Connection, notetype_id: i64) -> Result<Vec<Note>, rusqlite::Error> {
     let params = params![notetype_id];
-    let res = conn
-        .prepare(SELECT_NOTES)?
+    conn.prepare(SELECT_NOTES)?
         .query_map(params, |row| {
             let status: i64 = row.get(3)?;
             Ok(Note {
@@ -198,6 +197,5 @@ fn select_notes(conn: &Connection, notetype_id: i64) -> Result<Vec<Note>, rusqli
                 last_modified: row.get(2)?,
             })
         })?
-        .collect::<Result<Vec<Note>, _>>();
-    res
+        .collect::<Result<Vec<Note>, _>>()
 }

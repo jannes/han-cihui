@@ -4,15 +4,11 @@ use crate::{
 };
 use std::collections::{HashMap, HashSet};
 
+#[derive(Default)]
 pub enum AnalysisState {
+    #[default]
     Blank,
     Extracted(Box<ExtractedState>),
-}
-
-impl Default for AnalysisState {
-    fn default() -> Self {
-        AnalysisState::Blank
-    }
 }
 
 pub struct ExtractedState {

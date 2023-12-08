@@ -50,9 +50,9 @@ pub fn get_analysis_info_table(info: &AnalysisInfo, title: String) -> Table {
         ])
 }
 
-pub fn get_analysis_info_percentage_table<'a, 'b, 'c>(
-    info: &'a AnalysisInfo,
-    mic_occ_info: &'b AnalysisInfo,
+pub fn get_analysis_info_percentage_table<'c>(
+    info: &AnalysisInfo,
+    mic_occ_info: &AnalysisInfo,
 ) -> Table<'c> {
     let unknown_words_total_after = (info.unknown_total_words - mic_occ_info.unknown_total_words)
         as f64
@@ -156,11 +156,7 @@ pub fn get_centered_rect(r: Rect) -> Rect {
 
 // convert text to list of spans of wrapped text based on given area
 // see split_to_lines for prefix
-pub fn get_wrapping_spans<'a, 'b>(
-    s: &'a str,
-    area: &'b Rect,
-    prefix: Option<&'a str>,
-) -> Vec<Spans<'a>> {
+pub fn get_wrapping_spans<'a>(s: &'a str, area: &Rect, prefix: Option<&'a str>) -> Vec<Spans<'a>> {
     assert!(area.width > 2);
     split_to_lines(s, (area.width - 2) as usize, prefix)
         .into_iter()
@@ -192,17 +188,9 @@ pub fn split_to_lines(input: &str, width: usize, prefix: Option<&str>) -> Vec<St
     // transforming line to prefixed line
     let get_prefixed_line = |row: &mut String, is_first_line: bool| {
         if is_first_line {
-            format!(
-                "{}{}",
-                prefix_first_line,
-                &row.drain(..).collect::<String>()
-            )
+            format!("{}{}", prefix_first_line, &std::mem::take(row))
         } else {
-            format!(
-                "{}{}",
-                prefix_next_lines,
-                &row.drain(..).collect::<String>()
-            )
+            format!("{}{}", prefix_next_lines, &std::mem::take(row))
         }
     };
 

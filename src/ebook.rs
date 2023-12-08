@@ -35,7 +35,7 @@ impl FlatChapter {
 }
 
 pub fn open_as_flat_book(filename: &str) -> Result<FlatBook> {
-    let path_no_escaped_whitespace: String = filename.split('\\').into_iter().collect();
+    let path_no_escaped_whitespace: String = filename.split('\\').collect();
     let path = PathBuf::from(path_no_escaped_whitespace);
     let book = open_epub_as_book(&path)?;
     // flatten book such that there will be at least 4 chapters
