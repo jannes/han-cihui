@@ -2,6 +2,8 @@ use anyhow::Result;
 use rusqlite::{params, Connection};
 use std::collections::{HashMap, HashSet};
 
+use super::anki::NoteStatus;
+
 // vocabulary
 const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed)
                                  VALUES (?1, ?2, strftime('%s','now'))";
@@ -49,6 +51,15 @@ impl VocabStatus {
     }
 }
 
+impl From<NoteStatus> for VocabStatus {
+    fn from(status: NoteStatus) -> Self {
+        match status {
+            NoteStatus::Active => VocabStatus::Active,
+            NoteStatus::Inactive => VocabStatus::Inactive,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Vocab {
     pub word: String,
@@ -70,6 +81,8 @@ pub fn db_words_delete(conn: &Connection, words: &HashSet<String>) -> Result<()>
     Ok(())
 }
 
+/// Insert or update given vocabulary
+/// if latest_modified is Some, record Anki sync event in same transaction
 pub fn db_words_insert_overwrite(
     conn: &mut Connection,
     vocab: &HashMap<String, VocabStatus>,
