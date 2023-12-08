@@ -10,44 +10,32 @@ const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status, last_chang
                                     VALUES (?1, ?2, strftime('%s','now'))";
 
 const STATUS_ACTIVE: i64 = 0;
-const STATUS_SUSPENDED_KNOWN: i64 = 1;
-const STATUS_SUSPENDED_UNKNOWN: i64 = 2;
-const STATUS_ADDED_EXTERNAL_KNOWN: i64 = 3;
-const STATUS_ADDED_EXTERNAL_IGNORED: i64 = 4;
+const STATUS_SUSPENDED: i64 = 1;
+const STATUS_ADDED_EXTERNAL: i64 = 2;
 
-// const SETUP_EVENT_QUERY: &str = "
-//                            CREATE TABLE add_events (
-//                                id integer primary key autoincrement,
-//                                date text not null,
-//                                kind integer not null,
-//                                added_words integer not null,
-//                                added_chars integer not null
-//                             );";
-// const INSERT_EVENT_QUERY: &str =
-//     "INSERT INTO add_events (date, kind, added_words, added_chars) VALUES (?1, ?2, ?3, ?4)";
+const SELECT_MAX_MODIFED: &str =
+    "SELECT COALESCE(MAX(latest_modified), 0) as max_mod FROM anki_sync";
+const INSERT_SYNC: &str = "INSERT INTO anki_sync (latest_modified) VALUES (?1)";
 
-// const KIND_SYNCED: i64 = 0;
-// const KIND_ADDED_KNOWN: i64 = 1;
-// const KIND_ADDED_IGNORED: i64 = 2;
+pub fn select_max_modified(conn: &Connection) -> Result<i64> {
+    let mut stmt = conn.prepare(SELECT_MAX_MODIFED)?;
+    let max_mod = stmt.query_row([], |row| row.get::<usize, i64>(0))?;
+    Ok(max_mod)
+}
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VocabStatus {
     Active,
-    SuspendedKnown,
-    SuspendedUnknown,
-    AddedExternal(AddedExternal),
+    Inactive,
+    AddedExternal,
 }
 
 impl VocabStatus {
     fn from_i64(i: i64) -> Option<Self> {
         match i {
             STATUS_ACTIVE => Some(VocabStatus::Active),
-            STATUS_SUSPENDED_KNOWN => Some(VocabStatus::SuspendedKnown),
-            STATUS_SUSPENDED_UNKNOWN => Some(VocabStatus::SuspendedUnknown),
-            STATUS_ADDED_EXTERNAL_KNOWN => Some(VocabStatus::AddedExternal(AddedExternal::Known)),
-            STATUS_ADDED_EXTERNAL_IGNORED => {
-                Some(VocabStatus::AddedExternal(AddedExternal::Ignored))
-            }
+            STATUS_SUSPENDED => Some(VocabStatus::Inactive),
+            STATUS_ADDED_EXTERNAL => Some(VocabStatus::AddedExternal),
             _ => None,
         }
     }
@@ -55,18 +43,10 @@ impl VocabStatus {
     fn to_i64(self) -> i64 {
         match self {
             VocabStatus::Active => STATUS_ACTIVE,
-            VocabStatus::SuspendedKnown => STATUS_SUSPENDED_KNOWN,
-            VocabStatus::SuspendedUnknown => STATUS_SUSPENDED_UNKNOWN,
-            VocabStatus::AddedExternal(AddedExternal::Known) => STATUS_ADDED_EXTERNAL_KNOWN,
-            VocabStatus::AddedExternal(AddedExternal::Ignored) => STATUS_ADDED_EXTERNAL_IGNORED,
+            VocabStatus::Inactive => STATUS_SUSPENDED,
+            VocabStatus::AddedExternal => STATUS_ADDED_EXTERNAL,
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum AddedExternal {
-    Known,
-    Ignored,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -75,15 +55,8 @@ pub struct Vocab {
     pub status: VocabStatus,
 }
 
-pub fn db_words_add_external(
-    conn: &Connection,
-    words: &HashSet<&str>,
-    kind: AddedExternal,
-) -> Result<()> {
-    let status = match kind {
-        AddedExternal::Known => STATUS_ADDED_EXTERNAL_KNOWN,
-        AddedExternal::Ignored => STATUS_ADDED_EXTERNAL_IGNORED,
-    };
+pub fn db_words_add_external(conn: &Connection, words: &HashSet<&str>) -> Result<()> {
+    let status = STATUS_ADDED_EXTERNAL;
     for word in words {
         conn.execute(INSERT_WORD_QUERY, params![word, status])?;
     }
@@ -98,13 +71,20 @@ pub fn db_words_delete(conn: &Connection, words: &HashSet<String>) -> Result<()>
 }
 
 pub fn db_words_insert_overwrite(
-    conn: &Connection,
+    conn: &mut Connection,
     vocab: &HashMap<String, VocabStatus>,
+    latest_modified: Option<i64>,
 ) -> Result<()> {
+    let tx = conn.transaction()?;
+    // if new words insert is result from Anki sync, record sync
+    if let Some(latest_mod) = latest_modified {
+        tx.execute(INSERT_SYNC, params![latest_mod])?;
+    }
     for (word, status) in vocab {
         let status_int = status.to_i64();
-        conn.execute(OVERWRITE_WORD_QUERY, params![word, status_int])?;
+        tx.execute(OVERWRITE_WORD_QUERY, params![word, status_int])?;
     }
+    tx.commit()?;
     Ok(())
 }
 
@@ -125,7 +105,7 @@ pub fn db_words_select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
 pub fn db_words_select_known(conn: &Connection) -> Result<HashSet<String>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT (word) FROM words WHERE status != {}",
-        STATUS_SUSPENDED_UNKNOWN
+        STATUS_SUSPENDED
     ))?;
     let known_words = stmt
         .query_map([], |row| row.get(0))?

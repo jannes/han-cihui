@@ -45,8 +45,7 @@ impl DisplayState {
         self.previous_vocab_info.as_ref().map(|prev_vocab_info| {
             (
                 self.vocab_info.words_active as i64 - prev_vocab_info.words_active as i64,
-                self.vocab_info.chars_active_or_suspended_known as i64
-                    - prev_vocab_info.chars_active_or_suspended_known as i64,
+                self.vocab_info.chars_active as i64 - prev_vocab_info.chars_active as i64,
             )
         })
     }
@@ -68,8 +67,8 @@ impl SyncingState {
     pub fn new(previous_vocab_info: VocabularyInfo, db_connection: Arc<Mutex<Connection>>) -> Self {
         let (tx, rx) = mpsc::channel();
         let syncing_thread = thread::spawn(move || {
-            let db_conn = db_connection.lock().unwrap();
-            let res = db_sync_anki_data(&db_conn).and_then(|()| get_vocab_stats(&db_conn));
+            let mut db_conn = db_connection.lock().unwrap();
+            let res = db_sync_anki_data(&mut db_conn).and_then(|()| get_vocab_stats(&db_conn));
             tx.send(res).expect("could not send event");
         });
         Self {
@@ -91,7 +90,7 @@ impl SyncingState {
                 })),
                 Err(e) => Some(InfoState::SyncError(SyncErrorState {
                     previous_vocab_info: self.previous_vocab_info,
-                    error_msg: e.to_string(),
+                    error_msg: format!("Anki sync error: {e}"),
                 })),
             },
             Err(e) => match e {

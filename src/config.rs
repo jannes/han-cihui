@@ -5,9 +5,6 @@ use std::{env, fs};
 
 use serde::{Deserialize, Serialize};
 
-pub const ANKI_SUSPENDED_KNOWN_FLAG: i32 = 3; // green
-pub const ANKI_SUSPENDED_UNKNOWN_FLAG: i32 = 0; // no flag
-
 pub fn init_config(data_dir: &Path) {
     let config_path = data_dir.join("config.toml");
     let config = if !config_path.exists() {

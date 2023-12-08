@@ -6,7 +6,6 @@ use rusqlite::Connection;
 
 use crate::db::vocab::{
     db_words_add_external, db_words_delete, db_words_select_all, db_words_select_known,
-    AddedExternal,
 };
 
 pub fn get_arg_matches() -> ArgMatches {
@@ -30,24 +29,11 @@ pub fn get_arg_matches() -> ArgMatches {
                         .help("path to file with one word per line"),
                 ),
         )
-        .subcommand(
-            Command::new("add-ignore")
-                .about("Adds vocabulary to be ignored from file")
-                .arg(
-                    Arg::new("filename")
-                        .required(true)
-                        .help("path to file with one word per line"),
-                ),
-        )
         .subcommand(Command::new("show").about("Prints known words"))
         .get_matches()
 }
 
-pub fn perform_add_external(
-    data_conn: &Connection,
-    filename: &str,
-    kind: AddedExternal,
-) -> Result<()> {
+pub fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()> {
     let file_str = fs::read_to_string(filename)?;
     let words_to_add: HashSet<String> = file_str
         .split('\n')
@@ -65,7 +51,7 @@ pub fn perform_add_external(
     println!("amount saved: {}", &words_known.len());
     println!("amount to add: {}", &words_to_add.len());
     println!("amount new: {}", &words_unknown.len());
-    db_words_add_external(data_conn, words_unknown, kind)
+    db_words_add_external(data_conn, words_unknown)
 }
 
 pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result<()> {

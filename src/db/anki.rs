@@ -5,10 +5,11 @@ use std::{collections::HashMap, time::Instant};
 
 use anyhow::{Context, Result};
 use jieba_rs::Jieba;
-use rusqlite::{params, Connection, Statement, ToSql};
+use rusqlite::{params, Connection};
 
 use crate::{
-    config::{get_config, Config, ANKI_SUSPENDED_KNOWN_FLAG, ANKI_SUSPENDED_UNKNOWN_FLAG},
+    config::{get_config, Config},
+    db::vocab::select_max_modified,
     fan2jian::get_mapping,
     segmentation::extract_words,
 };
@@ -18,8 +19,7 @@ use super::vocab::{db_words_insert_overwrite, VocabStatus};
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum NoteStatus {
     Active,
-    SuspendedKnown,
-    SuspendedUnknown,
+    Suspended,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -29,8 +29,8 @@ pub struct Note {
     pub modified_timestamp: i64,
 }
 
-pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
-    let now = Instant::now();
+pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
+    let start_extract = Instant::now();
     let Config {
         anki_db_path,
         anki_notes,
@@ -39,45 +39,50 @@ pub fn db_sync_anki_data(data_conn: &Connection) -> Result<()> {
 
     let conn =
         Connection::open_with_flags(anki_db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
-    let zh_notes = get_zh_notes(&conn, anki_notes)?;
+    // let max_mod = select_max_modified(&conn).context("failed to select maximum latest modified")?;
+    let current_latest_mod = select_max_modified(&data_conn)?;
+    let zh_notes =
+        get_zh_notes(&conn, anki_notes, current_latest_mod).context("failed to select notes")?;
 
     // append notes into big long text for each status type
     let mut text_active = String::new();
-    let mut text_suspended_known = String::new();
-    let mut text_suspended_unknown = String::new();
-    let mut latest_modified = 0;
+    let mut text_suspended = String::new();
+    let mut new_latest_mod = 0;
     for note in zh_notes {
-        latest_modified = std::cmp::max(latest_modified, note.modified_timestamp);
+        new_latest_mod = std::cmp::max(new_latest_mod, note.modified_timestamp);
         match note.status {
             NoteStatus::Active => text_active.push_str(&note.fields_raw),
-            NoteStatus::SuspendedKnown => text_suspended_known.push_str(&note.fields_raw),
-            NoteStatus::SuspendedUnknown => text_suspended_unknown.push_str(&note.fields_raw),
+            NoteStatus::Suspended => text_suspended.push_str(&note.fields_raw),
         }
     }
 
-    eprintln!("lastest mod: {latest_modified}");
+    eprintln!("current latest mod: {current_latest_mod}");
+    eprintln!("new latest mod: {new_latest_mod}");
 
     // extract words from each big text and construct vocab
-    // active > suspended known > suspended unknown
-    // (e.g if word is both in active and unknown note, count as active)
+    // any word that is both active and inactive counts as active
     let jieba = Jieba::new();
     let fan2jian = get_mapping(true);
     let jian2fan = get_mapping(false);
     let mut vocab: HashMap<String, VocabStatus> = HashMap::new();
 
-    for word in extract_words(&text_suspended_unknown, &jieba, &fan2jian, &jian2fan) {
-        vocab.insert(word, VocabStatus::SuspendedUnknown);
-    }
-    for word in extract_words(&text_suspended_known, &jieba, &fan2jian, &jian2fan) {
-        vocab.insert(word, VocabStatus::SuspendedKnown);
+    for word in extract_words(&text_suspended, &jieba, &fan2jian, &jian2fan) {
+        vocab.insert(word, VocabStatus::Inactive);
     }
     for word in extract_words(&text_active, &jieba, &fan2jian, &jian2fan) {
         vocab.insert(word, VocabStatus::Active);
     }
-    let duration = now.elapsed();
-    eprintln!("anki sync extraction duration: {duration:#?})");
+    let duration = start_extract.elapsed();
+    eprintln!("anki sync extraction duration: {duration:#?}");
+    eprintln!("vocab len: {}", vocab.len());
 
-    db_words_insert_overwrite(data_conn, &vocab)
+    if vocab.len() > 0 {
+        let start_insert = Instant::now();
+        db_words_insert_overwrite(data_conn, &vocab, Some(new_latest_mod))?;
+        let duration = start_insert.elapsed();
+        eprintln!("anki sync insert duration: {duration:#?}");
+    }
+    Ok(())
 }
 
 /**
@@ -90,38 +95,47 @@ struct Notetype {
     name: String,
 }
 
-// cards.ord refers to card number
-// cards.ord = 0 selects Card 1
-// for 中文-英文 Notetype that is the Chinese->English Card
-const SELECT_ACTIVE_SQL: &str = "SELECT notes.flds, notes.mod FROM notes JOIN cards \
-            ON notes.id = cards.nid \
-            WHERE notes.mid = ?1 \
-            AND cards.queue != -1 \
-            AND cards.ord = 0";
+// get (note id, note fields, maximum modfification of note and its active cards) tuples
+// if any of a note's card is active, it is included here
+const SELECT_ACTIVE_SQL: &str =
+    "SELECT n.id, n.flds, MAX(COALESCE(n.mod, 0), COALESCE(c.mod, 0)) AS max_mod \
+     FROM notes n LEFT JOIN cards c ON n.id = c.nid \
+     WHERE n.mid = ?1 \
+     AND c.queue != -1 \
+     GROUP BY n.id, n.flds \
+     HAVING max_mod > ?2";
 
-const SELECT_INACTIVE_SQL: &str = "SELECT notes.flds, notes.mod FROM notes JOIN cards \
-            ON notes.id = cards.nid \
-            WHERE notes.mid = ?1 \
-            AND cards.queue = -1 \
-            AND cards.flags = ?2 \
-            AND cards.ord = 0";
+// get (note id, note fields, maximum modfification of note and its inactive cards) tuples
+// if any of a note's card is inactive, it is included here
+const SELECT_INACTIVE_SQL: &str =
+    "SELECT n.id, n.flds, MAX(COALESCE(n.mod, 0), COALESCE(c.mod, 0)) AS max_mod \
+     FROM notes n LEFT JOIN cards c ON n.id = c.nid \
+     WHERE n.mid = ?1 \
+     AND c.queue == -1 \
+     GROUP BY n.id, n.flds \
+     HAVING max_mod > ?2";
 
 const SELECT_NOTETYPES_SQL: &str = "SELECT notetypes.id, notetypes.name FROM notetypes";
 
-fn get_zh_notes(conn: &Connection, notetypes: Vec<String>) -> Result<Vec<Note>> {
+fn get_zh_notes(conn: &Connection, notetypes: Vec<String>, min_modified: i64) -> Result<Vec<Note>> {
     let notetypes = get_zh_notetypes(conn, notetypes)?;
     let mut all_notes: Vec<Note> = Vec::new();
     for Notetype {
         id: notetype_id, ..
     } in notetypes
     {
-        all_notes.extend(select_notes(conn, notetype_id, NoteStatus::Active)?);
         all_notes.extend(select_notes(
             conn,
             notetype_id,
-            NoteStatus::SuspendedUnknown,
+            NoteStatus::Active,
+            min_modified,
         )?);
-        all_notes.extend(select_notes(conn, notetype_id, NoteStatus::SuspendedKnown)?);
+        all_notes.extend(select_notes(
+            conn,
+            notetype_id,
+            NoteStatus::Suspended,
+            min_modified,
+        )?);
     }
     Ok(all_notes)
 }
@@ -149,34 +163,23 @@ fn get_zh_notetypes(conn: &Connection, zh_notetype_names: Vec<String>) -> Result
 
 fn select_notes(
     conn: &Connection,
-    note_type_id: i64,
+    notetype_id: i64,
     status: NoteStatus,
+    min_modified: i64,
 ) -> Result<Vec<Note>, rusqlite::Error> {
-    let stmt_to_result = |mut stmt: Statement, status: NoteStatus, params: &[&dyn ToSql]| {
-        stmt.query_map(params, |row| {
+    let params = params![notetype_id, min_modified];
+    let mut stmt = match status {
+        NoteStatus::Active => conn.prepare(SELECT_ACTIVE_SQL)?,
+        NoteStatus::Suspended => conn.prepare(SELECT_INACTIVE_SQL)?,
+    };
+    let res = stmt
+        .query_map(params, |row| {
             Ok(Note {
-                fields_raw: row.get(0)?,
+                fields_raw: row.get(1)?,
                 status,
-                modified_timestamp: row.get(1)?,
+                modified_timestamp: row.get(2)?,
             })
         })?
-        .collect::<Result<Vec<Note>, _>>()
-    };
-    match status {
-        NoteStatus::Active => {
-            let stmt = conn.prepare(SELECT_ACTIVE_SQL)?;
-            let params = params![note_type_id];
-            stmt_to_result(stmt, status, params)
-        }
-        NoteStatus::SuspendedUnknown => {
-            let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, ANKI_SUSPENDED_UNKNOWN_FLAG];
-            stmt_to_result(stmt, status, params)
-        }
-        NoteStatus::SuspendedKnown => {
-            let stmt = conn.prepare(SELECT_INACTIVE_SQL)?;
-            let params = params![note_type_id, ANKI_SUSPENDED_KNOWN_FLAG];
-            stmt_to_result(stmt, status, params)
-        }
-    }
+        .collect::<Result<Vec<Note>, _>>();
+    res
 }

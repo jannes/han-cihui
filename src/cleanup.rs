@@ -15,7 +15,7 @@ use rusqlite::Connection;
 pub fn main() -> Result<()> {
     let data_dir = get_data_dir();
     let db_path: PathBuf = [data_dir.as_path(), Path::new("data.db")].iter().collect();
-    let data_conn = Connection::open(db_path)?;
+    let mut data_conn = Connection::open(db_path)?;
     let vocabs = db_words_select_all(&data_conn)?;
     let amount_before = vocabs.len();
 
@@ -68,7 +68,7 @@ pub fn main() -> Result<()> {
         }
     } else if args.len() == 2 && args[1] == "--confirm" {
         println!("insert/overwrite {} words", to_add.len());
-        db_words_insert_overwrite(&data_conn, &to_add)?;
+        db_words_insert_overwrite(&mut data_conn, &to_add, None)?;
         println!("insert/overwrite success");
         println!("delete {}", to_delete.len());
         db_words_delete(&data_conn, &to_delete)?;
