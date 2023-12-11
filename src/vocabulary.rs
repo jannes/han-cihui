@@ -57,11 +57,11 @@ pub fn get_vocab_stats(data_conn: &Connection) -> Result<VocabularyInfo> {
     let mut words_active: HashSet<String> = HashSet::new();
     let mut words_inactive: HashSet<String> = HashSet::new();
     let mut words_external: HashSet<String> = HashSet::new();
-    for vocab in vocabs {
-        match vocab.status {
-            VocabStatus::Active => &words_active.insert(vocab.word),
-            VocabStatus::Inactive => &words_inactive.insert(vocab.word),
-            VocabStatus::AddedExternal => &words_external.insert(vocab.word),
+    for (word, status) in vocabs {
+        match status {
+            VocabStatus::Active => &words_active.insert(word),
+            VocabStatus::Inactive => &words_inactive.insert(word),
+            VocabStatus::AddedExternal => &words_external.insert(word),
         };
     }
 

@@ -5,25 +5,16 @@ use std::collections::{HashMap, HashSet};
 use super::anki::NoteStatus;
 
 // vocabulary
-const INSERT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words (word, status, last_changed)
-                                 VALUES (?1, ?2, strftime('%s','now'))";
-const DELETE_WORD_QUERY: &str = "DELETE FROM words WHERE word = ?1";
-const OVERWRITE_WORD_QUERY: &str = "REPLACE INTO words (word, status, last_changed)
-                                    VALUES (?1, ?2, strftime('%s','now'))";
+const DELETE_ANKI_WORDS_QUERY: &str = "DELETE FROM words_anki";
+const INSERT_ANKI_WORD_QUERY: &str = "INSERT INTO words_anki (word, status)
+                                    VALUES (?1, ?2)";
+
+const INSERT_EXT_WORD_QUERY: &str = "INSERT OR IGNORE INTO words_external (word, status)
+                                 VALUES (?1, ?2))";
+const DELETE_EXT_WORD_QUERY: &str = "DELETE FROM words_external WHERE word = ?1";
 
 const STATUS_ACTIVE: i64 = 0;
-const STATUS_SUSPENDED: i64 = 1;
-const STATUS_ADDED_EXTERNAL: i64 = 2;
-
-const SELECT_MAX_MODIFED: &str =
-    "SELECT COALESCE(MAX(latest_modified), 0) as max_mod FROM anki_sync";
-const INSERT_SYNC: &str = "INSERT INTO anki_sync (latest_modified) VALUES (?1)";
-
-pub fn select_max_modified(conn: &Connection) -> Result<i64> {
-    let mut stmt = conn.prepare(SELECT_MAX_MODIFED)?;
-    let max_mod = stmt.query_row([], |row| row.get::<usize, i64>(0))?;
-    Ok(max_mod)
-}
+const STATUS_INACTIVE: i64 = 1;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum VocabStatus {
@@ -33,20 +24,19 @@ pub enum VocabStatus {
 }
 
 impl VocabStatus {
-    fn from_i64(i: i64) -> Option<Self> {
+    fn from_i64(i: i64) -> Self {
         match i {
-            STATUS_ACTIVE => Some(VocabStatus::Active),
-            STATUS_SUSPENDED => Some(VocabStatus::Inactive),
-            STATUS_ADDED_EXTERNAL => Some(VocabStatus::AddedExternal),
-            _ => None,
+            STATUS_ACTIVE => VocabStatus::Active,
+            STATUS_INACTIVE => VocabStatus::Inactive,
+            _ => unreachable!(),
         }
     }
 
     fn to_i64(self) -> i64 {
         match self {
             VocabStatus::Active => STATUS_ACTIVE,
-            VocabStatus::Inactive => STATUS_SUSPENDED,
-            VocabStatus::AddedExternal => STATUS_ADDED_EXTERNAL,
+            VocabStatus::Inactive => STATUS_INACTIVE,
+            VocabStatus::AddedExternal => unreachable!(),
         }
     }
 }
@@ -61,67 +51,80 @@ impl From<NoteStatus> for VocabStatus {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct Vocab {
+pub struct AnkiWord {
     pub word: String,
-    pub status: VocabStatus,
+    pub status: NoteStatus,
 }
 
-pub fn db_words_add_external(conn: &Connection, words: &HashSet<&str>) -> Result<()> {
-    let status = STATUS_ADDED_EXTERNAL;
+pub fn db_words_external_add(conn: &Connection, words: &HashSet<&str>) -> Result<()> {
     for word in words {
-        conn.execute(INSERT_WORD_QUERY, params![word, status])?;
+        conn.execute(INSERT_EXT_WORD_QUERY, params![word])?;
     }
     Ok(())
 }
 
-pub fn db_words_delete(conn: &Connection, words: &HashSet<String>) -> Result<()> {
+pub fn db_words_external_del(conn: &Connection, words: &HashSet<String>) -> Result<()> {
     for word in words {
-        conn.execute(DELETE_WORD_QUERY, params![word])?;
+        conn.execute(DELETE_EXT_WORD_QUERY, params![word])?;
     }
     Ok(())
 }
 
-/// Insert or update given vocabulary
-/// if latest_modified is Some, record Anki sync event in same transaction
-pub fn db_words_insert_overwrite(
+/// Delete all previous Anki words and insert given set
+pub fn db_words_anki_update(
     conn: &mut Connection,
     vocab: &HashMap<String, VocabStatus>,
-    latest_modified: Option<i64>,
 ) -> Result<()> {
     let tx = conn.transaction()?;
-    // if new words insert is result from Anki sync, record sync
-    if let Some(latest_mod) = latest_modified {
-        tx.execute(INSERT_SYNC, params![latest_mod])?;
-    }
+    tx.execute(DELETE_ANKI_WORDS_QUERY, params![])?;
     for (word, status) in vocab {
         let status_int = status.to_i64();
-        tx.execute(OVERWRITE_WORD_QUERY, params![word, status_int])?;
+        tx.execute(INSERT_ANKI_WORD_QUERY, params![word, status_int])?;
     }
     tx.commit()?;
     Ok(())
 }
 
-pub fn db_words_select_all(conn: &Connection) -> Result<HashSet<Vocab>> {
-    let mut stmt = conn.prepare("SELECT * FROM words")?;
-    // can not collect as hash set somehow?
-    let vocab = stmt
+pub fn db_words_select_all(conn: &Connection) -> Result<HashMap<String, VocabStatus>> {
+    let mut stmt = conn.prepare("SELECT * FROM words_anki")?;
+    let mut words: HashMap<String, VocabStatus> = stmt
         .query_map([], |row| {
-            Ok(Vocab {
-                word: row.get(0)?,
-                status: VocabStatus::from_i64(row.get(1)?).unwrap(),
-            })
+            let word: String = row.get(0)?;
+            let status: i64 = row.get(1)?;
+            Ok((word, VocabStatus::from_i64(status)))
         })?
-        .collect::<Result<Vec<Vocab>, _>>();
-    Ok(vocab?.into_iter().collect())
+        .collect::<std::result::Result<HashMap<String, VocabStatus>, _>>()?;
+
+    let mut stmt = conn.prepare("SELECT * FROM words_external")?;
+    for word_external in stmt.query_map([], |row| {
+        let word: String = row.get(0)?;
+        Ok(word)
+    })? {
+        words
+            .entry(word_external?)
+            .and_modify(|status| {
+                // added external overrides inactive, but not active
+                // i.e word that is both inactive and added external counts as known
+                if matches!(status, VocabStatus::Inactive) {
+                    *status = VocabStatus::AddedExternal;
+                }
+            })
+            .or_insert(VocabStatus::AddedExternal);
+    }
+
+    Ok(words)
 }
 
 pub fn db_words_select_known(conn: &Connection) -> Result<HashSet<String>> {
-    let mut stmt = conn.prepare(&format!(
-        "SELECT (word) FROM words WHERE status != {}",
-        STATUS_SUSPENDED
-    ))?;
-    let known_words = stmt
-        .query_map([], |row| row.get(0))?
-        .collect::<Result<HashSet<String>, _>>()?;
-    Ok(known_words)
+    let vocab = db_words_select_all(conn)?;
+    Ok(vocab
+        .into_iter()
+        .filter_map(|(word, status)| {
+            if !matches!(status, VocabStatus::Inactive) {
+                Some(word)
+            } else {
+                None
+            }
+        })
+        .collect())
 }

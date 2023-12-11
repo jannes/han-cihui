@@ -17,10 +17,6 @@ path = "src/main.rs"
 name = "han-shaixuan"
 path = "src/tagger/main.rs"
 
-[[bin]]
-name = "cleanup"
-path = "src/cleanup.rs"
-
 [dependencies]
 anyhow = "1.0.32"
 clap = "4.1"

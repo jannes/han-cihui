@@ -5,7 +5,8 @@ use clap::{Arg, ArgMatches, Command};
 use rusqlite::Connection;
 
 use crate::db::vocab::{
-    db_words_add_external, db_words_delete, db_words_select_all, db_words_select_known,
+    db_words_external_add, db_words_external_del, db_words_select_all, db_words_select_known,
+    VocabStatus,
 };
 
 pub fn get_arg_matches() -> ArgMatches {
@@ -41,8 +42,14 @@ pub fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()
         .filter(|trimmed| !trimmed.is_empty())
         .collect();
     let words_known: HashSet<String> = db_words_select_all(data_conn)?
-        .iter()
-        .map(|vocab| String::from(&vocab.word))
+        .into_iter()
+        .filter_map(|(word, status)| {
+            if !matches!(status, VocabStatus::Inactive) {
+                Some(word)
+            } else {
+                None
+            }
+        })
         .collect();
     let words_unknown: &HashSet<&str> = &words_to_add
         .difference(&words_known)
@@ -51,7 +58,7 @@ pub fn perform_add_external(data_conn: &Connection, filename: &str) -> Result<()
     println!("amount saved: {}", &words_known.len());
     println!("amount to add: {}", &words_to_add.len());
     println!("amount new: {}", &words_unknown.len());
-    db_words_add_external(data_conn, words_unknown)
+    db_words_external_add(data_conn, words_unknown)
 }
 
 pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result<()> {
@@ -62,7 +69,7 @@ pub fn perform_delete_external(data_conn: &Connection, filename: &str) -> Result
         .filter(|trimmed| !trimmed.is_empty())
         .collect();
     println!("amount to delete: {}", &words_to_delete.len());
-    db_words_delete(data_conn, &words_to_delete)
+    db_words_external_del(data_conn, &words_to_delete)
 }
 
 pub fn show(conn: &Connection) -> Result<()> {

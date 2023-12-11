@@ -1,10 +1,7 @@
 extern crate rusqlite;
 extern crate serde_json;
 
-use std::{
-    collections::{HashMap, HashSet},
-    time::Instant,
-};
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::{Context, Result};
 use jieba_rs::Jieba;
@@ -12,12 +9,11 @@ use rusqlite::{params, Connection};
 
 use crate::{
     config::{get_config, Config},
-    db::vocab::select_max_modified,
     fan2jian::get_mapping,
     segmentation::extract_words,
 };
 
-use super::vocab::{db_words_insert_overwrite, VocabStatus};
+use super::vocab::{db_words_anki_update, VocabStatus};
 
 /// Whether the note is active (i.e one of its cards is) or suspended (all cards are suspended)
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -58,7 +54,7 @@ pub struct Note {
 /// Synchronize local vocabulary data with current Anki state
 ///
 /// Reads all relevant note data from Anki, recomputes Anki-based vocabulary state
-/// and updates the vocabulary that has changed state since last sync with Anki
+/// and saves it locally (fully deleting previous state)
 pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
     let start_extract = Instant::now();
     let Config {
@@ -69,30 +65,17 @@ pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
 
     let conn =
         Connection::open_with_flags(anki_db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)?;
-
-    // get latest modification time from previous sync and all note data from Anki DB
-    let current_latest_mod = select_max_modified(data_conn)?;
     let all_notes = get_zh_notes(&conn, anki_notes).context("failed to select notes")?;
 
     let jieba = Jieba::new();
     let fan2jian = get_mapping(true);
     let jian2fan = get_mapping(false);
     let mut all_vocab: HashMap<String, VocabStatus> = HashMap::new();
-    let mut mod_words: HashSet<String> = HashSet::new();
-    let mut new_latest_mod = 0;
 
     // extract words from each note and construct vocab
     // any word that is both active and inactive counts as active
-    // record all words that are contained on recently modified notes
     for note in all_notes {
-        new_latest_mod = std::cmp::max(new_latest_mod, note.last_modified);
         let words = extract_words(&note.fields_raw, &jieba, &fan2jian, &jian2fan);
-        // if note is recently modified, record all its words in the modified set
-        if note.last_modified > current_latest_mod {
-            for word in &words {
-                mod_words.insert(word.clone());
-            }
-        }
         let vocab_status = VocabStatus::from(note.status);
         // record & update word statuses
         for word in words {
@@ -109,25 +92,14 @@ pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
         }
     }
 
-    eprintln!("current latest mod: {current_latest_mod}");
-    eprintln!("new latest mod: {new_latest_mod}");
-
     let duration = start_extract.elapsed();
 
-    let mod_vocab: HashMap<String, VocabStatus> = all_vocab
-        .into_iter()
-        .filter(|(word, _)| mod_words.contains(word))
-        .collect();
-
     eprintln!("anki sync extraction duration: {duration:#?}");
-    eprintln!("modified vocab len: {}", mod_vocab.len());
 
-    if !mod_vocab.is_empty() {
-        let start_insert = Instant::now();
-        db_words_insert_overwrite(data_conn, &mod_vocab, Some(new_latest_mod))?;
-        let duration = start_insert.elapsed();
-        eprintln!("anki sync insert duration: {duration:#?}");
-    }
+    let start_insert = Instant::now();
+    db_words_anki_update(data_conn, &all_vocab)?;
+    let duration = start_insert.elapsed();
+    eprintln!("anki sync insert duration: {duration:#?}");
     Ok(())
 }
 
