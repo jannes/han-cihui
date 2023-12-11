@@ -20,7 +20,7 @@ use crate::{
     },
     ebook::FlatBook,
     extraction::word_to_hanzi,
-    segmentation::{segment_book, BookSegmentation, SegmentationMode},
+    segmentation::{segment_book, BookSegmentation},
     vocabulary::get_known_words_and_chars,
 };
 
@@ -92,7 +92,6 @@ pub fn get_enrich_book_with_stats(
     known_words: &HashSet<String>,
 ) -> BookWithStats {
     let mut word_sequence = Vec::new();
-    word_sequence.extend(&book.title_cut);
     for chapter in &book.chapter_cuts {
         word_sequence.extend(&chapter.cut);
     }
@@ -218,7 +217,7 @@ impl ImportingState {
         let book_author = book.author.clone();
         let (tx, rx) = mpsc::channel();
         let segmenter_thread = thread::spawn(move || {
-            let res = segment_book(&book, SegmentationMode::DictionaryOnly);
+            let res = segment_book(&book);
             tx.send(res).expect("could not send event");
         });
         ImportingState {

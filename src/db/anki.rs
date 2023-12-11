@@ -9,8 +9,8 @@ use rusqlite::{params, Connection};
 
 use crate::{
     config::{get_config, Config},
+    extraction::extract_words,
     fan2jian::get_mapping,
-    segmentation::extract_words,
 };
 
 use super::vocab::{db_words_anki_update, VocabStatus};

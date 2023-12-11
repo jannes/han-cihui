@@ -42,7 +42,7 @@ pub fn handle_event_analysis(
                 construct_word_list(book, title, author, analysis_query, &unknown_words_to_save);
             db_wlist_insert(&db.lock().unwrap(), word_list)
                 .context("unable to save word list to DB")?;
-            action_log_entry = Some(format!("Saved word list for {}", book.title_cut.join("")));
+            action_log_entry = Some(format!("Saved word list for {}", book.title));
         }
         // reduce min_occurrence of words
         KeyCode::Char('j') => {
