@@ -94,12 +94,12 @@ pub fn db_sync_anki_data(data_conn: &mut Connection) -> Result<()> {
 
     let duration = start_extract.elapsed();
 
-    eprintln!("anki sync extraction duration: {duration:#?}");
+    // eprintln!("anki sync extraction duration: {duration:#?}");
 
     let start_insert = Instant::now();
     db_words_anki_update(data_conn, &all_vocab)?;
     let duration = start_insert.elapsed();
-    eprintln!("anki sync insert duration: {duration:#?}");
+    // eprintln!("anki sync insert duration: {duration:#?}");
     Ok(())
 }
 
