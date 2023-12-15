@@ -53,7 +53,7 @@ pub fn draw_books_display(
             Cell::from(b.title.clone()),
             Cell::from(b.author.clone()),
             Cell::from(format!("{}", b.word_comprehension)),
-            Cell::from(format!("{}", b.total_chars)),
+            Cell::from(format!("{} chars", b.total_chars)),
         ];
         Row::new(cells)
     });
